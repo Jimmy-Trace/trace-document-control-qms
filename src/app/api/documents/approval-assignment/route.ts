@@ -34,12 +34,14 @@ function errorResponse(error: unknown) {
 export async function GET(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
-    const mode = request.nextUrl.searchParams.get("mode");
-    const result =
-      mode === "submission"
-        ? await service.listApprovers(context, context.organizationId)
-        : await service.list(context, context.organizationId);
-    return NextResponse.json({ data: result }, { status: 200 });
+    try {
+      const result = await service.list(context, context.organizationId);
+      return NextResponse.json({ data: result }, { status: 200 });
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== "Access denied") throw error;
+      const result = await service.listApprovers(context, context.organizationId);
+      return NextResponse.json({ data: result }, { status: 200 });
+    }
   } catch (error) {
     return errorResponse(error);
   }
