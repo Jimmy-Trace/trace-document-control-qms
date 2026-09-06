@@ -10,12 +10,14 @@
 | Isolated restoration target | |
 | Operators and observers | |
 | Approved RPO/RTO | |
+| Approved PostgreSQL version | |
 
 ## Procedure and evidence
 
 1. Confirm the restoration target is isolated and contains no production data.
 2. Record backup encryption, access approval, checksum, and retention metadata.
-3. Restore using the approved PostgreSQL 17 procedure without overwriting an
+3. Confirm the PostgreSQL client/server versions match the approved deployment
+   baseline, then restore using that approved procedure without overwriting an
    existing database.
 4. Apply only approved forward migrations required by the candidate.
 5. Run `prisma/tests/integrity.sql` against the restored database.
