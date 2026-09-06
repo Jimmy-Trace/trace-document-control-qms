@@ -132,12 +132,9 @@ export class PrismaApprovalSignatureStore implements ApprovalSignatureStore {
           where: {
             organizationId: input.organizationId,
             workflowInstanceId: workflow.id,
-            status: { in: ["PENDING", "IN_PROGRESS"] },
+            status: "IN_PROGRESS",
             stepKey: "APPROVAL",
-            OR: [
-              { assigneeUserId: null },
-              { assigneeUserId: input.signerUserId },
-            ],
+            assigneeUserId: input.signerUserId,
           },
           orderBy: { createdAt: "asc" },
         });
@@ -201,6 +198,7 @@ export class PrismaApprovalSignatureStore implements ApprovalSignatureStore {
               authenticationEventId: authentication.id,
               payloadHash: input.payloadHash,
               revisionLabel: input.revisionLabel,
+              workflowTaskId: eligibleTask.id,
             },
           },
         });

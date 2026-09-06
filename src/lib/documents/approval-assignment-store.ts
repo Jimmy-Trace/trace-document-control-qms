@@ -2,6 +2,77 @@ import { db } from "../db";
 import type { ApprovalAssignmentStore } from "./approval-assignment";
 
 export class PrismaApprovalAssignmentStore implements ApprovalAssignmentStore {
+  async list(organizationId: string) {
+    const [tasks, approvers] = await Promise.all([
+      db.workflowTask.findMany({
+        where: {
+          organizationId,
+          stepKey: "APPROVAL",
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          workflow: {
+            status: "ACTIVE",
+            state: "APPROVAL",
+            entityType: "DocumentVersion",
+          },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          assigneeUserId: true,
+          workflow: { select: { entityId: true } },
+        },
+      }),
+      db.user.findMany({
+        where: {
+          organizationId,
+          status: "ACTIVE",
+          roles: {
+            some: {
+              role: {
+                permissions: {
+                  some: { permission: { key: "document.approve" } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        select: { id: true, firstName: true, lastName: true, email: true },
+      }),
+    ]);
+    const versionIds = tasks.map((task) => task.workflow.entityId);
+    const versions = versionIds.length
+      ? await db.documentVersion.findMany({
+          where: { organizationId, id: { in: versionIds }, status: "IN_REVIEW" },
+          select: {
+            id: true,
+            revisionLabel: true,
+            document: { select: { documentNumber: true, title: true } },
+          },
+        })
+      : [];
+    const byId = new Map(versions.map((version) => [version.id, version]));
+    return {
+      tasks: tasks.flatMap((task) => {
+        const version = byId.get(task.workflow.entityId);
+        return version
+          ? [{
+              id: task.id,
+              documentVersionId: version.id,
+              documentNumber: version.document.documentNumber,
+              title: version.document.title,
+              revisionLabel: version.revisionLabel,
+              assigneeUserId: task.assigneeUserId,
+            }]
+          : [];
+      }),
+      approvers: approvers.map((user) => ({
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+      })),
+    };
+  }
+
   async assign(input: Parameters<ApprovalAssignmentStore["assign"]>[0]) {
     return db.$transaction(async (transaction) => {
       const task = await transaction.workflowTask.findFirst({

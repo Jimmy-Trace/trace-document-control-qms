@@ -3,7 +3,23 @@ import {
   type AuthorizationContext,
 } from "../security/authorization";
 
+export type ApprovalAssignmentOption = {
+  id: string;
+  name: string;
+};
+export type ApprovalAssignmentTask = {
+  id: string;
+  documentVersionId: string;
+  documentNumber: string;
+  title: string;
+  revisionLabel: string;
+  assigneeUserId: string | null;
+};
 export interface ApprovalAssignmentStore {
+  list(organizationId: string): Promise<{
+    tasks: ApprovalAssignmentTask[];
+    approvers: ApprovalAssignmentOption[];
+  }>;
   assign(input: {
     organizationId: string;
     workflowTaskId: string;
@@ -19,6 +35,14 @@ export class ApprovalAssignmentService {
     private readonly store: ApprovalAssignmentStore,
     private readonly clock: () => Date = () => new Date(),
   ) {}
+
+  list(context: AuthorizationContext, organizationId: string) {
+    requireAuthorization(context, {
+      organizationId,
+      permission: "document.review.manage",
+    });
+    return this.store.list(organizationId);
+  }
 
   async assign(
     context: AuthorizationContext,
