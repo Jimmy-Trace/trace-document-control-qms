@@ -26,6 +26,8 @@ export class ScheduledEffectivenessConcurrencyError extends Error {
   }
 }
 
+class ScheduledEffectivenessActivationConflict extends Error {}
+
 export function validateScheduledEffectiveAt(effectiveAt: Date, now: Date): void {
   if (Number.isNaN(effectiveAt.getTime()) || effectiveAt.getTime() <= now.getTime()) {
     throw new ScheduledEffectivenessError(
@@ -188,7 +190,9 @@ async function activateScheduledVersion(
             lockVersion: { increment: 1 },
           },
         });
-        if (superseded.count !== 1) return false;
+        if (superseded.count !== 1) {
+          throw new ScheduledEffectivenessActivationConflict();
+        }
       }
 
       const reviewDueAt = addMonthsUtc(scheduledAt, reviewMonths);
@@ -206,7 +210,9 @@ async function activateScheduledVersion(
           lockVersion: { increment: 1 },
         },
       });
-      if (changed.count !== 1) return false;
+      if (changed.count !== 1) {
+        throw new ScheduledEffectivenessActivationConflict();
+      }
 
       const documentChanged = await transaction.document.updateMany({
         where: {
@@ -219,7 +225,9 @@ async function activateScheduledVersion(
           lifecycleState: "ACTIVE",
         },
       });
-      if (documentChanged.count !== 1) return false;
+      if (documentChanged.count !== 1) {
+        throw new ScheduledEffectivenessActivationConflict();
+      }
 
       await transaction.documentReviewTask.create({
         data: {
@@ -255,7 +263,8 @@ async function activateScheduledVersion(
     });
   } catch (error) {
     if (error instanceof ScheduledEffectivenessError) throw error;
-    return false;
+    if (error instanceof ScheduledEffectivenessActivationConflict) return false;
+    throw error;
   }
 }
 
