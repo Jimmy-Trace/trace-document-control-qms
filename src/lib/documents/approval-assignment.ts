@@ -44,6 +44,15 @@ export class ApprovalAssignmentService {
     return this.store.list(organizationId);
   }
 
+  async listApprovers(context: AuthorizationContext, organizationId: string) {
+    requireAuthorization(context, {
+      organizationId,
+      permission: "document.submit",
+    });
+    const result = await this.store.list(organizationId);
+    return { approvers: result.approvers };
+  }
+
   async assign(
     context: AuthorizationContext,
     input: {
