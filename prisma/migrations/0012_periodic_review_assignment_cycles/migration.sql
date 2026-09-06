@@ -97,6 +97,23 @@ BEGIN
          OR NEW."createdAt" <> OLD."createdAt" THEN
         RAISE EXCEPTION 'Effective controlled document versions are immutable except for controlled supersession';
       END IF;
+    ELSIF NEW."status" = 'RETIRED' THEN
+      IF NEW."lockVersion" <> OLD."lockVersion" + 1
+         OR NEW."organizationId" <> OLD."organizationId"
+         OR NEW."documentId" <> OLD."documentId"
+         OR NEW."versionNumber" <> OLD."versionNumber"
+         OR NEW."revisionLabel" <> OLD."revisionLabel"
+         OR NEW."authoredByUserId" <> OLD."authoredByUserId"
+         OR NEW."contentHash" <> OLD."contentHash"
+         OR NEW."contentText" IS DISTINCT FROM OLD."contentText"
+         OR NEW."changeSummary" <> OLD."changeSummary"
+         OR NEW."effectiveAt" IS DISTINCT FROM OLD."effectiveAt"
+         OR NEW."reviewDueAt" IS DISTINCT FROM OLD."reviewDueAt"
+         OR NEW."supersededAt" IS DISTINCT FROM OLD."supersededAt"
+         OR NEW."fileId" IS DISTINCT FROM OLD."fileId"
+         OR NEW."createdAt" <> OLD."createdAt" THEN
+        RAISE EXCEPTION 'Effective controlled document versions are immutable except for controlled retirement';
+      END IF;
     ELSE
       RAISE EXCEPTION 'Effective controlled document versions require a controlled lifecycle transition';
     END IF;
