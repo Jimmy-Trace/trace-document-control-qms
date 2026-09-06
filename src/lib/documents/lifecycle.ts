@@ -29,6 +29,13 @@ export function nextDocumentVersionState(
   command: DocumentCommand,
   reason?: string,
 ): DocumentVersionState {
+  const next = transitions[command][current];
+  if (!next) {
+    throw new DocumentLifecycleError(
+      `Invalid document transition: ${current} cannot ${command}`,
+    );
+  }
+
   if ((command === "REJECT" || command === "RETIRE") && !reason?.trim()) {
     throw new DocumentLifecycleError(
       command === "RETIRE"
@@ -37,12 +44,6 @@ export function nextDocumentVersionState(
     );
   }
 
-  const next = transitions[command][current];
-  if (!next) {
-    throw new DocumentLifecycleError(
-      `Invalid document transition: ${current} cannot ${command}`,
-    );
-  }
   return next;
 }
 
