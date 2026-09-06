@@ -1,11 +1,51 @@
 import { db } from "../db";
 import { ACKNOWLEDGMENT_MEANING, type AcknowledgmentPayload } from "./payload";
-import type { AcknowledgmentStore, AssignmentEvidence } from "./service";
+import type { AcknowledgmentStore, AssignmentEvidence, AcknowledgmentDueState } from "./service";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function dueState(dueAt: Date | null, now: Date): { dueState: AcknowledgmentDueState; daysUntilDue: number | null } {
+  if (!dueAt) return { dueState: "UPCOMING", daysUntilDue: null };
+  const delta = dueAt.getTime() - now.getTime();
+  const daysUntilDue = Math.ceil(delta / DAY_MS);
+  if (delta < 0) return { dueState: "OVERDUE", daysUntilDue };
+  if (daysUntilDue <= 0) return { dueState: "DUE", daysUntilDue: 0 };
+  return { dueState: "UPCOMING", daysUntilDue };
+}
 
 export class PrismaAcknowledgmentStore implements AcknowledgmentStore {
   async listOutstanding(organizationId: string, now: Date) {
     const rows=await db.acknowledgmentAssignment.findMany({where:{organizationId,status:"ASSIGNED"},select:{id:true,documentVersionId:true,assignedToUserId:true,dueAt:true},orderBy:{dueAt:"asc"}});
     return rows.map(row=>({assignmentId:row.id,documentVersionId:row.documentVersionId,recipientUserId:row.assignedToUserId,dueAt:row.dueAt,overdue:Boolean(row.dueAt&&row.dueAt<now)}));
+  }
+  async listMine(organizationId: string, userId: string, now: Date) {
+    const rows = await db.acknowledgmentAssignment.findMany({
+      where: { organizationId, assignedToUserId: userId, status: "ASSIGNED" },
+      select: {
+        id: true,
+        documentId: true,
+        documentVersionId: true,
+        assignedAt: true,
+        dueAt: true,
+        document: { select: { documentNumber: true, title: true } },
+        documentVersion: { select: { revisionLabel: true, contentHash: true, status: true } },
+      },
+      orderBy: [{ dueAt: "asc" }, { assignedAt: "asc" }],
+    });
+    return rows
+      .filter((row) => row.documentVersion.status === "EFFECTIVE")
+      .map((row) => ({
+        assignmentId: row.id,
+        documentId: row.documentId,
+        documentVersionId: row.documentVersionId,
+        documentNumber: row.document.documentNumber,
+        title: row.document.title,
+        revisionLabel: row.documentVersion.revisionLabel,
+        contentHash: row.documentVersion.contentHash,
+        dueAt: row.dueAt,
+        assignedAt: row.assignedAt,
+        ...dueState(row.dueAt, now),
+      }));
   }
   async assign(input: { organizationId: string; versionId: string; recipientUserIds: string[]; assignedByUserId: string; dueAt: Date; assignedAt: Date }) {
     return db.$transaction(async tx => {
