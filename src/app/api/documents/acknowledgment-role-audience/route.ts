@@ -6,7 +6,7 @@ import { RoleAudienceDistributionService, RoleAudienceValidationError } from "@/
 
 const uuid = z.string().uuid();
 const service = new RoleAudienceDistributionService(new PrismaRoleAudienceStore());
-const assignSchema = z.object({ organizationId: uuid, roleId: uuid, versionId: uuid, dueAt: z.coerce.date() });
+const assignSchema = z.object({ roleId: uuid, versionId: uuid, dueAt: z.coerce.date() });
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
     const input = assignSchema.parse(await request.json());
-    const data = await service.assign(context, input);
+    const data = await service.assign(context, { ...input, organizationId: context.organizationId });
     return NextResponse.json({ data });
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
