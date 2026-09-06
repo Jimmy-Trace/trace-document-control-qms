@@ -37,6 +37,7 @@ export interface TransitionInput {
   reason?: string;
   assigneeUserId?: string;
   assigneeUserIds?: string[];
+  approverUserId?: string;
   dueAt?: Date;
   reviewStages?: Array<{ reviewerUserId: string; dueAt: Date }>;
   workflowTemplateId?: string;
@@ -86,6 +87,7 @@ export interface DocumentLifecycleStore {
     reason?: string;
     assigneeUserId?: string;
     assigneeUserIds?: string[];
+    approverUserId?: string;
     dueAt?: Date;
     reviewStages?: Array<{ reviewerUserId: string; dueAt: Date }>;
     workflowTemplateId?: string;
@@ -187,6 +189,14 @@ export class DocumentCommandService {
       );
     if (reviewStages.some((stage) => stage.dueAt <= this.clock()))
       throw new DocumentCommandError("Review due date must be in the future");
+    if (input.command === "SUBMIT") {
+      if (!input.approverUserId)
+        throw new DocumentCommandError("A final approver is required");
+      if (reviewers.includes(input.approverUserId))
+        throw new DocumentCommandError(
+          "The final approver must be distinct from the reviewers",
+        );
+    }
 
     const next = nextDocumentVersionState(
       version.status,
@@ -205,6 +215,7 @@ export class DocumentCommandService {
       reason: input.reason?.trim() || undefined,
       assigneeUserId: input.assigneeUserId,
       assigneeUserIds: reviewers,
+      approverUserId: input.approverUserId,
       dueAt: input.dueAt,
       reviewStages,
       workflowTemplateId: input.workflowTemplateId,
