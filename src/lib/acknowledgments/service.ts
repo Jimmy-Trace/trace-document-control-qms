@@ -3,7 +3,22 @@ import { requireAuthorization } from "../security/authorization";
 import { verifyPassword } from "../security/crypto";
 import { hashAcknowledgmentPayload, type AcknowledgmentPayload } from "./payload";
 
+export type AcknowledgmentDueState = "UPCOMING" | "DUE" | "OVERDUE";
+
 export interface AssignmentEvidence extends Omit<AcknowledgmentPayload, "signedAt"> { passwordHash: string; assignmentStatus: string; documentStatus: string; recipientStatus: string; }
+export interface RecipientAcknowledgment {
+  assignmentId: string;
+  documentId: string;
+  documentVersionId: string;
+  documentNumber: string;
+  title: string;
+  revisionLabel: string;
+  contentHash: string;
+  dueAt: Date | null;
+  assignedAt: Date;
+  dueState: AcknowledgmentDueState;
+  daysUntilDue: number | null;
+}
 export interface AcknowledgmentStore {
   assign(input: { organizationId: string; versionId: string; recipientUserIds: string[]; assignedByUserId: string; dueAt: Date; assignedAt: Date }): Promise<{ created: number }>;
   loadAssignment(organizationId: string, assignmentId: string, userId: string): Promise<AssignmentEvidence | null>;
@@ -11,6 +26,7 @@ export interface AcknowledgmentStore {
   recordFailure(evidence: AssignmentEvidence, at: Date): Promise<void>;
   complete(input: AcknowledgmentPayload & { payloadHash: string; authenticationValidUntil: Date }): Promise<{ completionId: string } | null>;
   listOutstanding(organizationId: string, now: Date): Promise<Array<{ assignmentId: string; documentVersionId: string; recipientUserId: string; dueAt: Date | null; overdue: boolean }>>;
+  listMine(organizationId: string, userId: string, now: Date): Promise<RecipientAcknowledgment[]>;
 }
 
 export class AcknowledgmentService {
@@ -26,6 +42,10 @@ export class AcknowledgmentService {
   async listOutstanding(context: AuthorizationContext, organizationId: string) {
     requireAuthorization(context, { organizationId, permission: "document.distribute" });
     return this.store.listOutstanding(organizationId, this.clock());
+  }
+  async listMine(context: AuthorizationContext, organizationId: string) {
+    requireAuthorization(context, { organizationId, permission: "document.acknowledge" });
+    return this.store.listMine(organizationId, context.userId, this.clock());
   }
   async complete(context: AuthorizationContext, input: { organizationId: string; assignmentId: string; password: string; confirmed: boolean }) {
     requireAuthorization(context, { organizationId: input.organizationId, permission: "document.acknowledge" });
