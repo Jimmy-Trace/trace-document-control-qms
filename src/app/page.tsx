@@ -1,4 +1,5 @@
 import { DocumentControlDashboard } from "@/components/document-control-dashboard";
+import { LifecycleOperations } from "@/components/lifecycle-operations";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -16,8 +17,11 @@ export default async function HomePage() {
   });
   if (!session || !validateSession(token, session).valid || session.user.status !== "ACTIVE") redirect("/login");
   return (
-    <DocumentControlDashboard
-      developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
-    />
+    <>
+      <DocumentControlDashboard
+        developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
+      />
+      <LifecycleOperations />
+    </>
   );
 }
