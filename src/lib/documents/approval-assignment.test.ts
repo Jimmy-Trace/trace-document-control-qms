@@ -22,6 +22,21 @@ const context: AuthorizationContext = {
 function fixture(changed = true) {
   const calls: unknown[] = [];
   const store: ApprovalAssignmentStore = {
+    async list() {
+      return {
+        tasks: [
+          {
+            id: "task-1",
+            documentVersionId: "version-1",
+            documentNumber: "SOP-001",
+            title: "Controlled SOP",
+            revisionLabel: "1.0",
+            assigneeUserId: null,
+          },
+        ],
+        approvers: [{ id: "approver-1", name: "Approver One" }],
+      };
+    },
     async assign(input) {
       calls.push(input);
       return changed;
@@ -31,6 +46,15 @@ function fixture(changed = true) {
 }
 
 describe("controlled approval assignment", () => {
+  it("lists assignable tasks through the review-management boundary", async () => {
+    await expect(
+      new ApprovalAssignmentService(fixture().store).list(context, "org-1"),
+    ).resolves.toMatchObject({
+      tasks: [{ id: "task-1" }],
+      approvers: [{ id: "approver-1" }],
+    });
+  });
+
   it("binds the assignment to the authenticated manager and trims the reason", async () => {
     const f = fixture();
     await expect(
