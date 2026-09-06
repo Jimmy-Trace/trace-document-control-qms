@@ -73,13 +73,17 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
         where: {
           organizationId: input.organizationId,
           id: input.sourceVersionId,
-          status: { in: ["EFFECTIVE", "SUPERSEDED"] },
+          status: "EFFECTIVE",
+          currentFor: {
+            organizationId: input.organizationId,
+            lifecycleState: "ACTIVE",
+          },
         },
         select: { documentId: true },
       });
       if (!source)
         throw new DocumentConfigurationError(
-          "An effective or superseded source version is required",
+          "The current effective version is required to create a successor revision",
         );
       const active = await transaction.documentVersion.count({
         where: {
@@ -388,7 +392,7 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
         if (input.command === "MAKE_EFFECTIVE") {
           await transaction.document.update({
             where: { id: input.documentId },
-            data: { currentVersionId: input.versionId },
+            data: { currentVersionId: input.versionId, lifecycleState: "ACTIVE" },
           });
           await transaction.documentReviewTask.create({
             data: {
@@ -398,6 +402,32 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
               dueAt: reviewDueAt!,
             },
           });
+        }
+
+        if (input.command === "RETIRE") {
+          await transaction.documentReviewTask.updateMany({
+            where: {
+              organizationId: input.organizationId,
+              documentId: input.documentId,
+              documentVersionId: input.versionId,
+              status: "PENDING",
+            },
+            data: { status: "CANCELLED" },
+          });
+          const retiredDocument = await transaction.document.updateMany({
+            where: {
+              organizationId: input.organizationId,
+              id: input.documentId,
+              currentVersionId: input.versionId,
+              lifecycleState: "ACTIVE",
+            },
+            data: {
+              lifecycleState: "RETIRED",
+              currentVersionId: null,
+            },
+          });
+          if (retiredDocument.count !== 1)
+            throw new ConcurrentTransitionError();
         }
 
         await transaction.auditEvent.create({
@@ -417,7 +447,9 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
               assigneeUserId: input.assigneeUserId,
               assigneeUserIds: reviewers,
               workflowTemplateId: input.workflowTemplateId,
-              dueAt: input.reviewStages?.map((stage) => stage.dueAt.toISOString()) ?? input.dueAt?.toISOString(),
+              dueAt:
+                input.reviewStages?.map((stage) => stage.dueAt.toISOString()) ??
+                input.dueAt?.toISOString(),
             },
           },
         });

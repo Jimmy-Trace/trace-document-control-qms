@@ -6,13 +6,22 @@ export type DocumentVersionState =
   | "SUPERSEDED"
   | "RETIRED";
 
-export type DocumentCommand = "SUBMIT" | "APPROVE" | "REJECT" | "MAKE_EFFECTIVE";
+export type DocumentCommand =
+  | "SUBMIT"
+  | "APPROVE"
+  | "REJECT"
+  | "MAKE_EFFECTIVE"
+  | "RETIRE";
 
-const transitions: Record<DocumentCommand, Partial<Record<DocumentVersionState, DocumentVersionState>>> = {
+const transitions: Record<
+  DocumentCommand,
+  Partial<Record<DocumentVersionState, DocumentVersionState>>
+> = {
   SUBMIT: { DRAFT: "IN_REVIEW" },
   APPROVE: { IN_REVIEW: "APPROVED" },
   REJECT: { IN_REVIEW: "DRAFT" },
   MAKE_EFFECTIVE: { APPROVED: "EFFECTIVE" },
+  RETIRE: { EFFECTIVE: "RETIRED" },
 };
 
 export function nextDocumentVersionState(
@@ -20,14 +29,21 @@ export function nextDocumentVersionState(
   command: DocumentCommand,
   reason?: string,
 ): DocumentVersionState {
-  if (command === "REJECT" && !reason?.trim()) {
-    throw new DocumentLifecycleError("A rejection reason is required");
-  }
-
   const next = transitions[command][current];
   if (!next) {
-    throw new DocumentLifecycleError(`Invalid document transition: ${current} cannot ${command}`);
+    throw new DocumentLifecycleError(
+      `Invalid document transition: ${current} cannot ${command}`,
+    );
   }
+
+  if ((command === "REJECT" || command === "RETIRE") && !reason?.trim()) {
+    throw new DocumentLifecycleError(
+      command === "RETIRE"
+        ? "A retirement reason is required"
+        : "A rejection reason is required",
+    );
+  }
+
   return next;
 }
 
@@ -40,11 +56,15 @@ export function validateDraftRevision(input: {
   if (!Number.isSafeInteger(input.versionNumber) || input.versionNumber <= 0) {
     throw new DocumentLifecycleError("Version number must be a positive integer");
   }
-  if (!input.revisionLabel.trim()) throw new DocumentLifecycleError("Revision label is required");
+  if (!input.revisionLabel.trim())
+    throw new DocumentLifecycleError("Revision label is required");
   if (!/^[a-f0-9]{64}$/.test(input.contentHash)) {
-    throw new DocumentLifecycleError("Content hash must be a lowercase SHA-256 digest");
+    throw new DocumentLifecycleError(
+      "Content hash must be a lowercase SHA-256 digest",
+    );
   }
-  if (!input.changeSummary.trim()) throw new DocumentLifecycleError("Change summary is required");
+  if (!input.changeSummary.trim())
+    throw new DocumentLifecycleError("Change summary is required");
 }
 
 export class DocumentLifecycleError extends Error {
