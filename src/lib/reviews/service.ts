@@ -17,6 +17,8 @@ export interface DueReview {
   title?: string;
   revisionLabel?: string;
   dueAt: Date;
+  assignedToUserId?: string | null;
+  cycleNumber?: number;
 }
 
 export interface OutstandingReview extends DueReview {
@@ -36,6 +38,14 @@ export interface ReviewStore {
     organizationId: string;
     taskId: string;
     eventKey: string;
+    occurredAt: Date;
+  }): Promise<boolean>;
+  assign(input: {
+    organizationId: string;
+    taskId: string;
+    assignedToUserId: string;
+    actorUserId: string;
+    reason: string;
     occurredAt: Date;
   }): Promise<boolean>;
   complete(input: {
@@ -126,6 +136,31 @@ export class DocumentReviewService {
     }
 
     return { evaluated: dueTasks.length, escalated, reminded };
+  }
+
+  async assign(
+    context: AuthorizationContext,
+    input: {
+      organizationId: string;
+      taskId: string;
+      assignedToUserId: string;
+      reason: string;
+    },
+  ) {
+    requireAuthorization(context, {
+      organizationId: input.organizationId,
+      permission: "document.review.manage",
+    });
+    if (input.reason.trim().length < 3)
+      throw new ReviewValidationError("An assignment reason is required");
+    const assigned = await this.store.assign({
+      ...input,
+      reason: input.reason.trim(),
+      actorUserId: context.userId,
+      occurredAt: this.clock(),
+    });
+    if (!assigned) throw new ReviewConflictError();
+    return { assigned: true };
   }
 
   async complete(
