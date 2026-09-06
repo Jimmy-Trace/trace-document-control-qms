@@ -35,6 +35,7 @@ const transition = z.object({
   reason: z.string().trim().min(1).max(4000).optional(),
   assigneeUserId: uuid.optional(),
   assigneeUserIds: z.array(uuid).min(1).max(10).optional(),
+  approverUserId: uuid.optional(),
   dueAt: z.coerce.date().optional(),
   reviewStages: z
     .array(z.object({ reviewerUserId: uuid, dueAt: z.coerce.date() }))
