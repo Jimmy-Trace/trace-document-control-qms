@@ -19,6 +19,28 @@ const schema = z.object({
 
 const service = new ApprovalAssignmentService(new PrismaApprovalAssignmentStore());
 
+function errorResponse(error: unknown) {
+  if (error instanceof AuthenticationRequiredError)
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  if (error instanceof ApprovalAssignmentConflictError)
+    return NextResponse.json({ error: error.message }, { status: 409 });
+  if (error instanceof z.ZodError || error instanceof ApprovalAssignmentValidationError)
+    return NextResponse.json({ error: "The approval assignment is invalid" }, { status: 422 });
+  if (error instanceof Error && error.message === "Access denied")
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  return NextResponse.json({ error: "Unable to manage approval assignment" }, { status: 500 });
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const context = await authenticateRequest(request);
+    const result = await service.list(context, context.organizationId);
+    return NextResponse.json({ data: result }, { status: 200 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
@@ -29,14 +51,6 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ data: result }, { status: 200 });
   } catch (error) {
-    if (error instanceof AuthenticationRequiredError)
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    if (error instanceof ApprovalAssignmentConflictError)
-      return NextResponse.json({ error: error.message }, { status: 409 });
-    if (error instanceof z.ZodError || error instanceof ApprovalAssignmentValidationError)
-      return NextResponse.json({ error: "The approval assignment is invalid" }, { status: 422 });
-    if (error instanceof Error && error.message === "Access denied")
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    return NextResponse.json({ error: "Unable to assign approval" }, { status: 500 });
+    return errorResponse(error);
   }
 }
