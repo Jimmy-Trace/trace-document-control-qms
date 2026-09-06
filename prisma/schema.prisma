@@ -101,6 +101,7 @@ model User {
   sessions                 Session[]                  @relation("SessionUser")
   revokedSessions          Session[]                  @relation("SessionRevoker")
   completedDocumentReviews DocumentReviewTask[]       @relation("ReviewCompleter")
+  assignedDocumentReviews  DocumentReviewTask[]       @relation("ReviewAssignee")
   notifications            NotificationOutbox[]       @relation("NotificationRecipient")
 
   @@unique([organizationId, id])
@@ -132,7 +133,7 @@ model Role {
 }
 
 model Permission {
-  id          String           @id @default(uuid()) @db.Uuid
+  id          String           @id @default(uuid())
   key         String           @unique
   description String?
   roles       RolePermission[]
@@ -420,6 +421,8 @@ model DocumentReviewTask {
   organizationId    String                     @db.Uuid
   documentId        String                     @db.Uuid
   documentVersionId String                     @db.Uuid
+  assignedToUserId  String?                    @db.Uuid
+  cycleNumber       Int                        @default(1)
   dueAt             DateTime                   @db.Timestamptz(3)
   status            DocumentReviewStatus       @default(PENDING)
   completedAt       DateTime?                  @db.Timestamptz(3)
@@ -430,12 +433,14 @@ model DocumentReviewTask {
   organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   document          Document                   @relation(fields: [organizationId, documentId], references: [organizationId, id], onDelete: Restrict)
   documentVersion   DocumentVersion            @relation(fields: [organizationId, documentId, documentVersionId], references: [organizationId, documentId, id], onDelete: Restrict)
+  assignedTo        User?                      @relation("ReviewAssignee", fields: [organizationId, assignedToUserId], references: [organizationId, id], onDelete: Restrict)
   completedBy       User?                      @relation("ReviewCompleter", fields: [organizationId, completedByUserId], references: [organizationId, id], onDelete: Restrict)
   escalations       DocumentReviewEscalation[]
 
   @@unique([organizationId, id])
-  @@unique([organizationId, documentVersionId])
+  @@unique([organizationId, documentVersionId, cycleNumber])
   @@index([organizationId, status, dueAt])
+  @@index([organizationId, assignedToUserId, status, dueAt])
 }
 
 enum DocumentReviewStatus {
