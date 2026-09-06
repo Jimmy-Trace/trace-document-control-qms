@@ -177,12 +177,37 @@ export class PrismaWorkflowReviewStore implements WorkflowReviewStore {
           });
           return "NEXT_REVIEW";
         }
-        await transaction.workflowTask.create({
-          data: {
+        const approval = await transaction.workflowTask.findFirst({
+          where: {
             organizationId: input.organizationId,
             workflowInstanceId: task.workflowInstanceId,
             stepKey: "APPROVAL",
             status: "PENDING",
+            assigneeUserId: { not: null },
+          },
+          orderBy: { createdAt: "asc" },
+        });
+        if (!approval?.assigneeUserId) throw new WorkflowStateConflict();
+        const activated = await transaction.workflowTask.updateMany({
+          where: {
+            id: approval.id,
+            organizationId: input.organizationId,
+            status: "PENDING",
+            assigneeUserId: approval.assigneeUserId,
+          },
+          data: { status: "IN_PROGRESS" },
+        });
+        if (activated.count !== 1) throw new WorkflowStateConflict();
+        await transaction.notificationOutbox.create({
+          data: {
+            organizationId: input.organizationId,
+            recipientUserId: approval.assigneeUserId,
+            eventKey: `document-approval-ready:${approval.id}:${approval.assigneeUserId}`,
+            templateKey: "DOCUMENT_APPROVAL_ASSIGNED",
+            payload: {
+              documentVersionId: task.workflow.entityId,
+              taskId: approval.id,
+            },
           },
         });
         await transaction.workflowInstance.update({
@@ -198,7 +223,12 @@ export class PrismaWorkflowReviewStore implements WorkflowReviewStore {
             entityId: task.workflow.entityId,
             reason: input.comment,
             occurredAt: input.occurredAt,
-            metadata: { taskId: task.id, workflowId: task.workflowInstanceId },
+            metadata: {
+              taskId: task.id,
+              workflowId: task.workflowInstanceId,
+              approvalTaskId: approval.id,
+              approverUserId: approval.assigneeUserId,
+            },
           },
         });
         return "AWAITING_APPROVAL";

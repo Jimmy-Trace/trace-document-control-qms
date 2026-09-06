@@ -1,6 +1,7 @@
 import { DocumentControlDashboard } from "@/components/document-control-dashboard";
 import { LifecycleOperations } from "@/components/lifecycle-operations";
 import { ApprovalOperations } from "@/components/approval-operations";
+import { ControlledSubmission } from "@/components/controlled-submission";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -22,6 +23,7 @@ export default async function HomePage() {
       <DocumentControlDashboard
         developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
       />
+      <ControlledSubmission />
       <ApprovalOperations />
       <LifecycleOperations />
     </>

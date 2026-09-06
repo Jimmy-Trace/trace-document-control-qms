@@ -18,6 +18,18 @@ const context: AuthorizationContext = {
     },
   ],
 };
+const submitterContext: AuthorizationContext = {
+  userId: "owner-1",
+  organizationId: "org-1",
+  userState: "ACTIVE",
+  grants: [
+    {
+      permission: "document.submit",
+      scopeType: "ORGANIZATION",
+      scopeId: null,
+    },
+  ],
+};
 
 function fixture(changed = true) {
   const calls: unknown[] = [];
@@ -52,6 +64,17 @@ describe("controlled approval assignment", () => {
     ).resolves.toMatchObject({
       tasks: [{ id: "task-1" }],
       approvers: [{ id: "approver-1" }],
+    });
+  });
+
+  it("exposes only eligible approver options to an authorized submitter", async () => {
+    await expect(
+      new ApprovalAssignmentService(fixture().store).listApprovers(
+        submitterContext,
+        "org-1",
+      ),
+    ).resolves.toEqual({
+      approvers: [{ id: "approver-1", name: "Approver One" }],
     });
   });
 

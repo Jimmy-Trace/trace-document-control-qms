@@ -184,6 +184,8 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
     try {
       return await db.$transaction(async (transaction) => {
         if (input.command === "SUBMIT") {
+          if (!input.approverUserId)
+            throw new DocumentConfigurationError("A final approver is required");
           const definition = await transaction.workflowDefinition.findFirst({
             where: {
               organizationId: input.organizationId,
@@ -205,6 +207,39 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
           if (input.workflowTemplateId && templateStages.length !== reviewers.length)
             throw new DocumentConfigurationError(
               "The selected workflow template does not match the reviewer stages",
+            );
+          const version = await transaction.documentVersion.findFirst({
+            where: {
+              organizationId: input.organizationId,
+              id: input.versionId,
+              status: "DRAFT",
+            },
+            select: { authoredByUserId: true },
+          });
+          if (!version || version.authoredByUserId === input.approverUserId)
+            throw new DocumentConfigurationError(
+              "The document author cannot be the final approver",
+            );
+          const approver = await transaction.user.findFirst({
+            where: {
+              id: input.approverUserId,
+              organizationId: input.organizationId,
+              status: "ACTIVE",
+              roles: {
+                some: {
+                  role: {
+                    permissions: {
+                      some: { permission: { key: "document.approve" } },
+                    },
+                  },
+                },
+              },
+            },
+            select: { id: true },
+          });
+          if (!approver)
+            throw new DocumentConfigurationError(
+              "The selected final approver is not eligible",
             );
           const workflow = await transaction.workflowInstance.create({
             data: {
@@ -244,15 +279,14 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
                 "One or more selected reviewers are not eligible",
               );
           }
-          const stages = reviewers.length ? reviewers : [null];
-          for (const [index, reviewerId] of stages.entries())
+          for (const [index, reviewerId] of reviewers.entries())
             await transaction.workflowTask.create({
               data: {
                 organizationId: input.organizationId,
                 workflowInstanceId: workflow.id,
-                stepKey: reviewerId ? `REVIEW_${index + 1}` : "APPROVAL",
+                stepKey: `REVIEW_${index + 1}`,
                 assigneeUserId: reviewerId,
-                status: reviewerId && index === 0 ? "IN_PROGRESS" : "PENDING",
+                status: index === 0 ? "IN_PROGRESS" : "PENDING",
                 dueAt:
                   input.reviewStages?.[index]?.dueAt ??
                   input.dueAt ??
@@ -260,6 +294,16 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
                 comments: input.comment,
               },
             });
+          await transaction.workflowTask.create({
+            data: {
+              organizationId: input.organizationId,
+              workflowInstanceId: workflow.id,
+              stepKey: "APPROVAL",
+              assigneeUserId: input.approverUserId,
+              status: reviewers.length ? "PENDING" : "IN_PROGRESS",
+              comments: input.comment,
+            },
+          });
           for (const [index, reviewerId] of reviewers.entries())
             await transaction.notificationOutbox.create({
               data: {
@@ -275,6 +319,19 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
                     input.dueAt ??
                     templateDueAt(input.occurredAt, templateStages[index]?.dueDays)
                   )?.toISOString(),
+                },
+              },
+            });
+          if (!reviewers.length)
+            await transaction.notificationOutbox.create({
+              data: {
+                organizationId: input.organizationId,
+                recipientUserId: input.approverUserId,
+                eventKey: `document-approval-ready:${workflow.id}:${input.approverUserId}`,
+                templateKey: "DOCUMENT_APPROVAL_ASSIGNED",
+                payload: {
+                  documentVersionId: input.versionId,
+                  workflowId: workflow.id,
                 },
               },
             });
@@ -446,6 +503,7 @@ export class PrismaDocumentLifecycleStore implements DocumentLifecycleStore {
               priorLockVersion: input.expectedLockVersion,
               assigneeUserId: input.assigneeUserId,
               assigneeUserIds: reviewers,
+              approverUserId: input.approverUserId,
               workflowTemplateId: input.workflowTemplateId,
               dueAt:
                 input.reviewStages?.map((stage) => stage.dueAt.toISOString()) ??
