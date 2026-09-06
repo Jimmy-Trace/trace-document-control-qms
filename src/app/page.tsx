@@ -2,6 +2,7 @@ import { DocumentControlDashboard } from "@/components/document-control-dashboar
 import { LifecycleOperations } from "@/components/lifecycle-operations";
 import { ApprovalOperations } from "@/components/approval-operations";
 import { ControlledSubmission } from "@/components/controlled-submission";
+import { MyAcknowledgments } from "@/components/my-acknowledgments";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -26,6 +27,7 @@ export default async function HomePage() {
       <ControlledSubmission />
       <ApprovalOperations />
       <LifecycleOperations />
+      <MyAcknowledgments />
     </>
   );
 }
