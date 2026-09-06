@@ -202,7 +202,10 @@ describe("document command boundary", () => {
   });
 
   it("requires a distinct final approver on submission", async () => {
-    const service = new DocumentCommandService(store(draft).implementation);
+    const service = new DocumentCommandService(
+      store(draft).implementation,
+      () => new Date("2026-08-25T00:00:00Z"),
+    );
     await expect(
       service.transition(activeContext, {
         organizationId: "org-1",
