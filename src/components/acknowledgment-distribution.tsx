@@ -43,7 +43,6 @@ export function AcknowledgmentDistribution() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        organizationId: String(form.get("organizationId")),
         roleId: String(form.get("roleId")),
         versionId: String(form.get("versionId")),
         dueAt: String(form.get("dueAt")),
@@ -79,7 +78,6 @@ export function AcknowledgmentDistribution() {
               {busy && !options && <p>Loading distribution options…</p>}
               {options && (
                 <form className="approval-box" onSubmit={submit}>
-                  <input type="hidden" name="organizationId" value={(globalThis as unknown as { __unused?: string }).__unused || ""} readOnly />
                   <label>
                     Effective document version
                     <select name="versionId" required defaultValue="">
