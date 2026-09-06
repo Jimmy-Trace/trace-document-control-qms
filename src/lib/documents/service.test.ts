@@ -178,7 +178,7 @@ describe("document command boundary", () => {
     });
   });
 
-  it("passes revision-specific assignment evidence on submission", async () => {
+  it("passes review and final approver evidence on submission", async () => {
     const fixture = store(draft),
       service = new DocumentCommandService(
         fixture.implementation,
@@ -190,13 +190,38 @@ describe("document command boundary", () => {
       command: "SUBMIT",
       expectedLockVersion: 3,
       assigneeUserIds: ["reviewer-1", "reviewer-2"],
+      approverUserId: "approver-1",
       dueAt: new Date("2026-09-01T00:00:00Z"),
       comment: "Review the collection changes",
     });
     expect(fixture.transitions[0]).toMatchObject({
       assigneeUserIds: ["reviewer-1", "reviewer-2"],
+      approverUserId: "approver-1",
       comment: "Review the collection changes",
     });
+  });
+
+  it("requires a distinct final approver on submission", async () => {
+    const service = new DocumentCommandService(store(draft).implementation);
+    await expect(
+      service.transition(activeContext, {
+        organizationId: "org-1",
+        versionId: "version-1",
+        command: "SUBMIT",
+        expectedLockVersion: 3,
+      }),
+    ).rejects.toThrow("final approver");
+    await expect(
+      service.transition(activeContext, {
+        organizationId: "org-1",
+        versionId: "version-1",
+        command: "SUBMIT",
+        expectedLockVersion: 3,
+        assigneeUserIds: ["reviewer-1"],
+        approverUserId: "reviewer-1",
+        dueAt: new Date("2026-09-01T00:00:00Z"),
+      }),
+    ).rejects.toThrow("distinct");
   });
 
   it("rejects duplicate sequential reviewer stages", async () => {
@@ -211,6 +236,7 @@ describe("document command boundary", () => {
         command: "SUBMIT",
         expectedLockVersion: 3,
         assigneeUserIds: ["reviewer-1", "reviewer-1"],
+        approverUserId: "approver-1",
         dueAt: new Date("2026-09-01T00:00:00Z"),
       }),
     ).rejects.toThrow("unique");
@@ -226,6 +252,7 @@ describe("document command boundary", () => {
       versionId: "version-1",
       command: "SUBMIT",
       expectedLockVersion: 3,
+      approverUserId: "approver-1",
       reviewStages: [
         { reviewerUserId: "reviewer-1", dueAt: new Date("2026-09-01T00:00:00Z") },
         { reviewerUserId: "reviewer-2", dueAt: new Date("2026-09-05T00:00:00Z") },
@@ -245,11 +272,13 @@ describe("document command boundary", () => {
       command: "SUBMIT",
       expectedLockVersion: 3,
       assigneeUserIds: ["reviewer-1", "reviewer-2"],
+      approverUserId: "approver-1",
       workflowTemplateId: "template-1",
     });
     expect(fixture.transitions[0]).toMatchObject({
       workflowTemplateId: "template-1",
       assigneeUserIds: ["reviewer-1", "reviewer-2"],
+      approverUserId: "approver-1",
     });
   });
 
@@ -265,6 +294,7 @@ describe("document command boundary", () => {
         versionId: "version-1",
         command: "SUBMIT",
         expectedLockVersion: 3,
+        approverUserId: "approver-1",
       }),
     ).resolves.toMatchObject({ status: "IN_REVIEW", lockVersion: 4 });
     expect(fixture.transitions[0]).toMatchObject({
@@ -272,6 +302,7 @@ describe("document command boundary", () => {
       from: "DRAFT",
       to: "IN_REVIEW",
       expectedLockVersion: 3,
+      approverUserId: "approver-1",
     });
   });
 
@@ -319,6 +350,7 @@ describe("document command boundary", () => {
         versionId: "version-1",
         command: "SUBMIT",
         expectedLockVersion: 3,
+        approverUserId: "approver-1",
       }),
     ).rejects.toThrow("changed");
   });
