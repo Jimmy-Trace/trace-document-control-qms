@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "../db";
 import type { ReviewOutcome, ReviewStore } from "./service";
 
@@ -389,7 +390,7 @@ export class PrismaReviewStore implements ReviewStore {
   }
 
   private async recipientIds(
-    transaction: Parameters<Parameters<typeof db.$transaction>[0]>[0],
+    transaction: Prisma.TransactionClient,
     organizationId: string,
     assignedToUserId: string | null,
   ) {
