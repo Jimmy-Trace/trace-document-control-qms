@@ -23,18 +23,23 @@ const manager: AuthorizationContext = {
 function fixture() {
   const escalations: number[] = [];
   const reminderKeys: string[] = [];
+  const assignments: string[] = [];
   let completed = false;
   const overdue = {
     id: "r1",
     documentId: "d1",
     documentVersionId: "v1",
     dueAt: new Date("2026-07-01T00:00:00Z"),
+    assignedToUserId: "reviewer-1",
+    cycleNumber: 1,
   };
   const upcoming = {
     id: "r2",
     documentId: "d2",
     documentVersionId: "v2",
     dueAt: new Date("2026-09-15T00:00:00Z"),
+    assignedToUserId: null,
+    cycleNumber: 1,
   };
   const store: ReviewStore = {
     async listDue() {
@@ -56,13 +61,17 @@ function fixture() {
       reminderKeys.push(input.eventKey);
       return true;
     },
+    async assign(input) {
+      assignments.push(input.assignedToUserId);
+      return true;
+    },
     async complete() {
       if (completed) return false;
       completed = true;
       return true;
     },
   };
-  return { store, escalations, reminderKeys };
+  return { store, escalations, reminderKeys, assignments };
 }
 
 describe("periodic document review", () => {
@@ -94,12 +103,16 @@ describe("periodic document review", () => {
     await expect(service.listOutstanding(manager, "org-1")).resolves.toEqual([
       expect.objectContaining({
         id: "r1",
+        assignedToUserId: "reviewer-1",
+        cycleNumber: 1,
         reviewState: "OVERDUE",
         overdue: true,
         daysUntilDue: -54,
       }),
       expect.objectContaining({
         id: "r2",
+        assignedToUserId: null,
+        cycleNumber: 1,
         reviewState: "UPCOMING",
         overdue: false,
         daysUntilDue: 22,
@@ -127,6 +140,9 @@ describe("periodic document review", () => {
       async remind() {
         return false;
       },
+      async assign() {
+        return true;
+      },
       async complete() {
         return true;
       },
@@ -142,6 +158,34 @@ describe("periodic document review", () => {
         overdue: false,
       }),
     ]);
+  });
+
+  it("assigns an outstanding periodic review with controlled reason", async () => {
+    const f = fixture();
+    const service = new DocumentReviewService(
+      f.store,
+      () => new Date("2026-08-24T00:00:00Z"),
+    );
+    await expect(
+      service.assign(manager, {
+        organizationId: "org-1",
+        taskId: "r2",
+        assignedToUserId: "reviewer-2",
+        reason: "Quality manager assignment",
+      }),
+    ).resolves.toEqual({ assigned: true });
+    expect(f.assignments).toEqual(["reviewer-2"]);
+  });
+
+  it("requires a controlled assignment reason", async () => {
+    await expect(
+      new DocumentReviewService(fixture().store).assign(manager, {
+        organizationId: "org-1",
+        taskId: "r2",
+        assignedToUserId: "reviewer-2",
+        reason: " ",
+      }),
+    ).rejects.toThrow("reason");
   });
 
   it("blocks cross-tenant review queue access", async () => {
