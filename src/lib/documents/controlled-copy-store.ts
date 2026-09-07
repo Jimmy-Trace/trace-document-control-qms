@@ -33,7 +33,7 @@ export class PrismaControlledCopyStore implements ControlledCopyStore {
         INSERT INTO "ControlledCopy" (
           "organizationId","documentVersionId","copyNumber","recipientName","location","purpose","issuedByUserId","issuedAt"
         ) VALUES (
-          ${input.organizationId}::uuid, ${input.documentVersionId}::uuid, ${Number(next[0]?.value ?? 1n)},
+          ${input.organizationId}::uuid, ${input.documentVersionId}::uuid, ${Number(next[0]?.value ?? BigInt(1))},
           ${input.recipientName}, ${input.location}, ${input.purpose}, ${input.issuedByUserId}::uuid, ${input.issuedAt}
         ) RETURNING *
       `);
