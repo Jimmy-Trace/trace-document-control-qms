@@ -8,6 +8,8 @@ const uuid = z.string().uuid();
 const command = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("CREATE_FOLDER"), parentFolderId: uuid.nullable(), name: z.string().max(120) }),
   z.object({ operation: z.literal("RENAME_FOLDER"), folderId: uuid, name: z.string().max(120) }),
+  z.object({ operation: z.literal("MOVE_FOLDER"), folderId: uuid, parentFolderId: uuid.nullable() }),
+  z.object({ operation: z.literal("DELETE_FOLDER"), folderId: uuid }),
   z.object({ operation: z.literal("PLACE_DOCUMENT"), documentId: uuid, folderId: uuid }),
 ]);
 const service = new FolderHierarchyService(new PrismaFolderStore());
@@ -29,6 +31,8 @@ export async function POST(request: NextRequest) {
     const input = command.parse(await request.json());
     if (input.operation === "CREATE_FOLDER") return NextResponse.json({ data: await service.create(context, { organizationId: context.organizationId, parentFolderId: input.parentFolderId, name: input.name }) }, { status: 201 });
     if (input.operation === "RENAME_FOLDER") { await service.rename(context, { organizationId: context.organizationId, folderId: input.folderId, name: input.name }); return NextResponse.json({ data: { updated: true } }); }
+    if (input.operation === "MOVE_FOLDER") { await service.move(context, { organizationId: context.organizationId, folderId: input.folderId, parentFolderId: input.parentFolderId }); return NextResponse.json({ data: { updated: true } }); }
+    if (input.operation === "DELETE_FOLDER") { await service.delete(context, { organizationId: context.organizationId, folderId: input.folderId }); return NextResponse.json({ data: { deleted: true } }); }
     await service.place(context, { organizationId: context.organizationId, documentId: input.documentId, folderId: input.folderId });
     return NextResponse.json({ data: { updated: true } });
   } catch (error) {
