@@ -21,7 +21,7 @@ type QualityRecord = {
   createdAt: string;
 };
 
-export function RecordManagementWorkspace({ canCreate, canArchive, canConfigureTypes }: { canCreate: boolean; canArchive: boolean; canConfigureTypes: boolean }) {
+export function RecordManagementWorkspace({ canCreate, canArchive, canExport, canConfigureTypes }: { canCreate: boolean; canArchive: boolean; canExport: boolean; canConfigureTypes: boolean }) {
   const [types, setTypes] = useState<RecordType[]>([]);
   const [records, setRecords] = useState<QualityRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -127,6 +127,37 @@ export function RecordManagementWorkspace({ canCreate, canArchive, canConfigureT
     await load();
   }
 
+  async function exportRecord(record: QualityRecord) {
+    const reason = window.prompt(`Export ${record.recordNumber}. Enter the controlled export reason:`);
+    if (!reason?.trim()) return;
+    setBusy(true);
+    setNotice("");
+    const response = await fetch(`/api/records/${record.id}/export`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      setBusy(false);
+      return setNotice(body?.error || "Record could not be exported.");
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] || `${record.recordNumber}-export`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setBusy(false);
+    setNotice(`Record ${record.recordNumber} exported after integrity verification with audit evidence.`);
+  }
+
   return (
     <section className="workspace-section" aria-labelledby="record-management-heading">
       <div className="section-heading">
@@ -182,7 +213,11 @@ export function RecordManagementWorkspace({ canCreate, canArchive, canConfigureT
                 <td>{record.status}</td>
                 <td>{record.occurredAt ? new Date(record.occurredAt).toLocaleString() : "—"}</td>
                 <td>{new Date(record.createdAt).toLocaleString()}</td>
-                <td>{canArchive && record.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={() => void archiveRecord(record)}>Archive</button> : "—"}</td>
+                <td>
+                  {canExport && record.fileId && <button type="button" disabled={busy} onClick={() => void exportRecord(record)}>Export exact file</button>}
+                  {canArchive && record.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void archiveRecord(record)}>Archive</button>}
+                  {!((canExport && record.fileId) || (canArchive && record.status === "ACTIVE")) && "—"}
+                </td>
               </tr>;
             })}
             {!visibleRecords.length && <tr><td colSpan={7}>{records.length ? "No records match the current search." : "No regulated records have been created."}</td></tr>}
