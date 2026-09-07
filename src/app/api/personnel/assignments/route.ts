@@ -13,6 +13,12 @@ const createSchema = z.object({
   isPrimary: z.boolean().optional(),
   assignedAt: z.string().date(),
 });
+const endSchema = z.object({
+  operation: z.literal("END"),
+  assignmentId: z.string().uuid(),
+  endedAt: z.string().date(),
+  reason: z.string().max(1000),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +34,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
-    const input = createSchema.parse(await request.json());
+    const body = await request.json();
+    if (body?.operation === "END") {
+      const input = endSchema.parse(body);
+      return NextResponse.json({ data: await service.endAssignment(context, {
+        organizationId: context.organizationId,
+        assignmentId: input.assignmentId,
+        endedAt: new Date(`${input.endedAt}T00:00:00.000Z`),
+        reason: input.reason,
+      }) });
+    }
+    const input = createSchema.parse(body);
     return NextResponse.json({ data: await service.createAssignment(context, {
       organizationId: context.organizationId,
       employeeId: input.employeeId,
