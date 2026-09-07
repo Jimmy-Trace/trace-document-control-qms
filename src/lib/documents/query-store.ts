@@ -1,12 +1,19 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../db";
 import type { DocumentQueryStore } from "./query";
 export class PrismaDocumentQueryStore implements DocumentQueryStore {
   async list(input: Parameters<DocumentQueryStore["list"]>[0]) {
+    const folderDocumentIds = input.folderId
+      ? await db.$queryRaw<Array<{ documentId: string }>>(Prisma.sql`
+          SELECT "documentId" FROM "DocumentFolderPlacement"
+          WHERE "organizationId"=${input.organizationId}::uuid AND "folderId"=${input.folderId}::uuid`)
+      : null;
     return db.documentVersion
       .findMany({
         where: {
           organizationId: input.organizationId,
           status: input.status,
+          documentId: folderDocumentIds ? { in: folderDocumentIds.map((row) => row.documentId) } : undefined,
           AND: [
             input.cursor
               ? {
