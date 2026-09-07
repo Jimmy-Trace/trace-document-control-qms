@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { hashOpaqueToken } from "@/lib/security/crypto";
 import { validateSession } from "@/lib/security/session";
+import { workspaceVisibility } from "@/lib/security/workspace-visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -21,23 +22,42 @@ export default async function HomePage() {
   if (!token) redirect("/login");
   const session = await db.session.findUnique({
     where: { tokenHash: hashOpaqueToken(token) },
-    include: { user: true },
+    include: {
+      user: {
+        include: {
+          roles: {
+            include: {
+              role: {
+                include: {
+                  permissions: { include: { permission: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   if (!session || !validateSession(token, session).valid || session.user.status !== "ACTIVE") redirect("/login");
+
+  const visibility = workspaceVisibility(
+    session.user.roles.flatMap(({ role }) => role.permissions.map(({ permission }) => permission.key)),
+  );
+
   return (
     <>
       <DocumentControlDashboard
         developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
       />
-      <ControlledSubmission />
-      <ApprovalOperations />
-      <LifecycleOperations />
-      <MyAcknowledgments />
-      <AcknowledgmentDistribution />
-      <OrganizationalAcknowledgmentDistribution />
-      <MembershipAdministration />
-      <DocumentFolderManager />
-      <RetentionAdministration />
+      {visibility.controlledSubmission && <ControlledSubmission />}
+      {visibility.approvalOperations && <ApprovalOperations />}
+      {visibility.lifecycleOperations && <LifecycleOperations />}
+      {visibility.acknowledgments && <MyAcknowledgments />}
+      {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
+      {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
+      {visibility.membershipAdministration && <MembershipAdministration />}
+      {visibility.folderManager && <DocumentFolderManager />}
+      {visibility.retentionAdministration && <RetentionAdministration />}
     </>
   );
 }
