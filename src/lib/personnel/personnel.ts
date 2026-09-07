@@ -53,6 +53,14 @@ export interface PersonnelStore {
     hireDate: Date | null;
     actorUserId: string;
   }): Promise<EmployeeRecord>;
+  transitionEmployee(input: {
+    organizationId: string;
+    employeeId: string;
+    targetStatus: EmployeeStatus;
+    effectiveDate: Date | null;
+    reason: string;
+    actorUserId: string;
+  }): Promise<EmployeeRecord>;
   listJobDescriptions(organizationId: string): Promise<JobDescriptionRecord[]>;
   createJobDescription(input: {
     organizationId: string;
@@ -70,6 +78,13 @@ export interface PersonnelStore {
     departmentId: string | null;
     isPrimary: boolean;
     assignedAt: Date;
+    actorUserId: string;
+  }): Promise<EmployeeJobAssignmentRecord>;
+  endAssignment(input: {
+    organizationId: string;
+    assignmentId: string;
+    endedAt: Date;
+    reason: string;
     actorUserId: string;
   }): Promise<EmployeeJobAssignmentRecord>;
 }
@@ -103,6 +118,29 @@ export class PersonnelService {
       firstName,
       lastName,
       hireDate: input.hireDate ?? null,
+      actorUserId: context.userId,
+    });
+  }
+
+  async transitionEmployee(context: AuthorizationContext, input: {
+    organizationId: string;
+    employeeId: string;
+    targetStatus: EmployeeStatus;
+    effectiveDate?: Date | null;
+    reason: string;
+  }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "personnel.manage" });
+    const reason = input.reason.trim();
+    if (!reason || reason.length > 1000) throw new PersonnelValidationError("A controlled personnel status reason is required");
+    const effectiveDate = input.effectiveDate ?? null;
+    if (effectiveDate && Number.isNaN(effectiveDate.getTime())) throw new PersonnelValidationError("Personnel status effective date is invalid");
+    if (input.targetStatus === "TERMINATED" && !effectiveDate) throw new PersonnelValidationError("Termination date is required");
+    return this.store.transitionEmployee({
+      organizationId: input.organizationId,
+      employeeId: input.employeeId,
+      targetStatus: input.targetStatus,
+      effectiveDate,
+      reason,
       actorUserId: context.userId,
     });
   }
@@ -151,6 +189,25 @@ export class PersonnelService {
       departmentId: input.departmentId ?? null,
       isPrimary: input.isPrimary ?? false,
       assignedAt: input.assignedAt,
+      actorUserId: context.userId,
+    });
+  }
+
+  async endAssignment(context: AuthorizationContext, input: {
+    organizationId: string;
+    assignmentId: string;
+    endedAt: Date;
+    reason: string;
+  }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "personnel.manage" });
+    if (Number.isNaN(input.endedAt.getTime())) throw new PersonnelValidationError("Assignment end date is invalid");
+    const reason = input.reason.trim();
+    if (!reason || reason.length > 1000) throw new PersonnelValidationError("A controlled assignment end reason is required");
+    return this.store.endAssignment({
+      organizationId: input.organizationId,
+      assignmentId: input.assignmentId,
+      endedAt: input.endedAt,
+      reason,
       actorUserId: context.userId,
     });
   }
