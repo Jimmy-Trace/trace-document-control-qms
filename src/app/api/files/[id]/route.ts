@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { authenticateRequest, AuthenticationRequiredError } from "@/lib/security/authenticated-request";
 import { requireAuthorization } from "@/lib/security/authorization";
 import { PrivateObjectStorage } from "@/lib/storage/s3";
+import { assertFileDispositionAllowed } from "@/lib/retention/prisma-store";
+import { DispositionBlockedError } from "@/lib/retention/service";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,7 +25,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const context = await authenticateRequest(request), id = z.string().uuid().parse((await params).id); requireAuthorization(context, { organizationId: context.organizationId, permission: "document.delete" });
     const row = await db.fileObject.findFirst({ where: { id, organizationId: context.organizationId }, include: { documentVersions: { select: { id: true }, take: 1 } } });
     if (!row || row.documentVersions.length) return NextResponse.json({ error: "Controlled files cannot be removed" }, { status: 409 });
+    await assertFileDispositionAllowed({ organizationId: context.organizationId, fileId: row.id });
     await db.$transaction([db.fileObject.update({ where: { id: row.id }, data: { status: "ARCHIVED" } }), db.auditEvent.create({ data: { organizationId: context.organizationId, actorUserId: context.userId, action: "FILE_ARCHIVED", entityType: "FileObject", entityId: row.id, previousHash: row.sha256, reason: "Retention-safe logical removal" } })]);
     return NextResponse.json({ data: { id: row.id, status: "ARCHIVED" } });
-  } catch (error) { if (error instanceof AuthenticationRequiredError) return NextResponse.json({ error: "Authentication required" }, { status: 401 }); return NextResponse.json({ error: "File could not be archived" }, { status: 403 }); }
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (error instanceof DispositionBlockedError) return NextResponse.json({ error: error.message }, { status: 409 });
+    return NextResponse.json({ error: "File could not be archived" }, { status: 403 });
+  }
 }
