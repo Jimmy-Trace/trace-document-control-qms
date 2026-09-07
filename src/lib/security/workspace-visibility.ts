@@ -13,6 +13,8 @@ export type WorkspaceVisibility = {
   recordArchive: boolean;
   recordExport: boolean;
   recordTypeAdministration: boolean;
+  personnelManagement: boolean;
+  personnelManage: boolean;
 };
 
 export function workspaceVisibility(permissionKeys: Iterable<string>): WorkspaceVisibility {
@@ -34,5 +36,7 @@ export function workspaceVisibility(permissionKeys: Iterable<string>): Workspace
     recordArchive: has("record.archive"),
     recordExport: has("record.export"),
     recordTypeAdministration: has("administration.manage"),
+    personnelManagement: has("personnel.read"),
+    personnelManage: has("personnel.manage"),
   };
 }
