@@ -62,7 +62,7 @@ function store(): PersonnelStore {
 describe("personnel service", () => {
   it("requires personnel.read for personnel listings", async () => {
     const service = new PersonnelService(store());
-    await expect(service.listEmployees({ ...context("personnel.read"), grants: [] }, organizationId)).rejects.toThrow("Access denied");
+    expect(() => service.listEmployees({ ...context("personnel.read"), grants: [] }, organizationId)).toThrow("Access denied");
     await expect(service.listJobDescriptions(context("personnel.read"), organizationId)).resolves.toHaveLength(1);
   });
 
