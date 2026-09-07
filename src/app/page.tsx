@@ -3,6 +3,7 @@ import { LifecycleOperations } from "@/components/lifecycle-operations";
 import { ApprovalOperations } from "@/components/approval-operations";
 import { ControlledSubmission } from "@/components/controlled-submission";
 import { MyAcknowledgments } from "@/components/my-acknowledgments";
+import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribution";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -28,6 +29,7 @@ export default async function HomePage() {
       <ApprovalOperations />
       <LifecycleOperations />
       <MyAcknowledgments />
+      <AcknowledgmentDistribution />
     </>
   );
 }
