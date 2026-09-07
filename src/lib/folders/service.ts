@@ -6,6 +6,8 @@ export interface FolderStore {
   list(organizationId: string): Promise<{ folders: FolderNode[]; documents: FolderDocument[] }>;
   createFolder(input: { organizationId: string; parentFolderId: string | null; name: string; actorUserId: string; occurredAt: Date }): Promise<{ id: string }>;
   renameFolder(input: { organizationId: string; folderId: string; name: string; actorUserId: string; occurredAt: Date }): Promise<void>;
+  moveFolder(input: { organizationId: string; folderId: string; parentFolderId: string | null; actorUserId: string; occurredAt: Date }): Promise<void>;
+  deleteFolder(input: { organizationId: string; folderId: string; actorUserId: string; occurredAt: Date }): Promise<void>;
   placeDocument(input: { organizationId: string; documentId: string; folderId: string; actorUserId: string; occurredAt: Date }): Promise<void>;
 }
 
@@ -26,6 +28,16 @@ export class FolderHierarchyService {
   async rename(context: AuthorizationContext, input: { organizationId: string; folderId: string; name: string }) {
     requireAuthorization(context, { organizationId: input.organizationId, permission: "document.create" });
     await this.store.renameFolder({ ...input, name: validateName(input.name), actorUserId: context.userId, occurredAt: this.clock() });
+  }
+
+  async move(context: AuthorizationContext, input: { organizationId: string; folderId: string; parentFolderId: string | null }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "document.create" });
+    await this.store.moveFolder({ ...input, actorUserId: context.userId, occurredAt: this.clock() });
+  }
+
+  async delete(context: AuthorizationContext, input: { organizationId: string; folderId: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "document.create" });
+    await this.store.deleteFolder({ ...input, actorUserId: context.userId, occurredAt: this.clock() });
   }
 
   async place(context: AuthorizationContext, input: { organizationId: string; documentId: string; folderId: string }) {
