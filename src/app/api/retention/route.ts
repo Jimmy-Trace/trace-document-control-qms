@@ -5,7 +5,7 @@ import { PrismaRetentionStore } from "@/lib/retention/prisma-store";
 import { RetentionService, RetentionValidationError } from "@/lib/retention/service";
 
 const uuid = z.string().uuid();
-const entityType = z.enum(["Document", "DocumentVersion", "FileObject"]);
+const entityType = z.enum(["Document", "DocumentVersion", "FileObject", "QualityRecord"]);
 const command = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("CREATE_POLICY"), recordType: z.string().max(80), jurisdiction: z.string().max(120).nullable().optional(), retentionDays: z.number().int() }),
   z.object({ operation: z.literal("SET_POLICY_ACTIVE"), policyId: uuid, active: z.boolean() }),

@@ -15,6 +15,7 @@ describe("workspace visibility", () => {
       retentionAdministration: false,
       recordManagement: false,
       recordCreate: false,
+      recordArchive: false,
       recordTypeAdministration: false,
     });
   });
@@ -43,17 +44,20 @@ describe("workspace visibility", () => {
     expect(visibility.recordTypeAdministration).toBe(true);
   });
 
-  it("keeps record browsing and record creation independently least-privileged", () => {
+  it("keeps record browsing, creation, and archival independently least-privileged", () => {
     const reader = workspaceVisibility(["record.read"]);
     expect(reader.recordManagement).toBe(true);
     expect(reader.recordCreate).toBe(false);
-
-    const creatorWithoutRead = workspaceVisibility(["record.create"]);
-    expect(creatorWithoutRead.recordManagement).toBe(false);
-    expect(creatorWithoutRead.recordCreate).toBe(true);
+    expect(reader.recordArchive).toBe(false);
 
     const creator = workspaceVisibility(["record.read", "record.create"]);
     expect(creator.recordManagement).toBe(true);
     expect(creator.recordCreate).toBe(true);
+    expect(creator.recordArchive).toBe(false);
+
+    const archiver = workspaceVisibility(["record.read", "record.archive"]);
+    expect(archiver.recordManagement).toBe(true);
+    expect(archiver.recordCreate).toBe(false);
+    expect(archiver.recordArchive).toBe(true);
   });
 });

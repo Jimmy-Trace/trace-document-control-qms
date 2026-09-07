@@ -43,11 +43,18 @@ export interface RecordStore {
     fileId: string | null;
     actorUserId: string;
   }): Promise<QualityRecord>;
+  archiveRecord(input: {
+    organizationId: string;
+    recordId: string;
+    reason: string;
+    actorUserId: string;
+    occurredAt: Date;
+  }): Promise<QualityRecord | null>;
   listRecords(organizationId: string): Promise<QualityRecord[]>;
 }
 
 export class RecordService {
-  constructor(private readonly store: RecordStore) {}
+  constructor(private readonly store: RecordStore, private readonly clock: () => Date = () => new Date()) {}
 
   async createType(context: AuthorizationContext, input: {
     organizationId: string;
@@ -91,6 +98,15 @@ export class RecordService {
       fileId: input.fileId ?? null,
       actorUserId: context.userId,
     });
+  }
+
+  async archiveRecord(context: AuthorizationContext, input: { organizationId: string; recordId: string; reason: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "record.archive" });
+    const reason = input.reason.trim();
+    if (!reason || reason.length > 1000) throw new RecordValidationError("Archive reason is required and must be 1000 characters or fewer");
+    const result = await this.store.archiveRecord({ ...input, reason, actorUserId: context.userId, occurredAt: this.clock() });
+    if (!result) throw new RecordEligibilityError("Record is not active or its state changed; reload and try again");
+    return result;
   }
 
   async listRecords(context: AuthorizationContext, organizationId: string) {

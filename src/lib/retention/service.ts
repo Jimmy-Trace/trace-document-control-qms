@@ -1,6 +1,6 @@
 import { requireAuthorization, type AuthorizationContext } from "../security/authorization";
 
-export type HoldEntityType = "Document" | "DocumentVersion" | "FileObject";
+export type HoldEntityType = "Document" | "DocumentVersion" | "FileObject" | "QualityRecord";
 export type DispositionState = "HELD" | "RETAINED" | "ELIGIBLE";
 export interface DispositionStatus {
   entityType: HoldEntityType;
