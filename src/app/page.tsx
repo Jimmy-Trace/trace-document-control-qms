@@ -12,6 +12,7 @@ import { DocumentFolderManager } from "@/components/document-folder-manager";
 import { RetentionAdministration } from "@/components/retention-administration";
 import { RecordManagementWorkspace } from "@/components/record-management-workspace";
 import { PersonnelManagementWorkspace } from "@/components/personnel-management-workspace";
+import { PersonnelCredentialWorkspace } from "@/components/personnel-credential-workspace";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -73,6 +74,7 @@ export default async function HomePage() {
         />
       )}
       {visibility.personnelManagement && <PersonnelManagementWorkspace canManage={visibility.personnelManage} />}
+      {visibility.personnelManagement && <PersonnelCredentialWorkspace canManage={visibility.personnelManage} />}
     </>
   );
 }
