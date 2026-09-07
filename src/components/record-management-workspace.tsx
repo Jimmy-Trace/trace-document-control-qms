@@ -21,7 +21,7 @@ type QualityRecord = {
   createdAt: string;
 };
 
-export function RecordManagementWorkspace({ canCreate, canConfigureTypes }: { canCreate: boolean; canConfigureTypes: boolean }) {
+export function RecordManagementWorkspace({ canCreate, canArchive, canConfigureTypes }: { canCreate: boolean; canArchive: boolean; canConfigureTypes: boolean }) {
   const [types, setTypes] = useState<RecordType[]>([]);
   const [records, setRecords] = useState<QualityRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -110,6 +110,23 @@ export function RecordManagementWorkspace({ canCreate, canConfigureTypes }: { ca
     await load();
   }
 
+  async function archiveRecord(record: QualityRecord) {
+    const reason = window.prompt(`Archive ${record.recordNumber}. Enter the controlled disposition reason:`);
+    if (!reason?.trim()) return;
+    setBusy(true);
+    setNotice("");
+    const response = await fetch("/api/records", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "ARCHIVE", recordId: record.id, reason }),
+    });
+    const body = await response.json().catch(() => null);
+    setBusy(false);
+    if (!response.ok) return setNotice(body?.error || "Record could not be archived.");
+    setNotice(`Record ${record.recordNumber} archived with retention and audit evidence.`);
+    await load();
+  }
+
   return (
     <section className="workspace-section" aria-labelledby="record-management-heading">
       <div className="section-heading">
@@ -154,7 +171,7 @@ export function RecordManagementWorkspace({ canCreate, canConfigureTypes }: { ca
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Record</th><th>Title</th><th>Type</th><th>Status</th><th>Occurred</th><th>Created</th></tr></thead>
+          <thead><tr><th>Record</th><th>Title</th><th>Type</th><th>Status</th><th>Occurred</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
             {visibleRecords.map((record) => {
               const type = typeById.get(record.recordTypeId);
@@ -165,9 +182,10 @@ export function RecordManagementWorkspace({ canCreate, canConfigureTypes }: { ca
                 <td>{record.status}</td>
                 <td>{record.occurredAt ? new Date(record.occurredAt).toLocaleString() : "—"}</td>
                 <td>{new Date(record.createdAt).toLocaleString()}</td>
+                <td>{canArchive && record.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={() => void archiveRecord(record)}>Archive</button> : "—"}</td>
               </tr>;
             })}
-            {!visibleRecords.length && <tr><td colSpan={6}>{records.length ? "No records match the current search." : "No regulated records have been created."}</td></tr>}
+            {!visibleRecords.length && <tr><td colSpan={7}>{records.length ? "No records match the current search." : "No regulated records have been created."}</td></tr>}
           </tbody>
         </table>
       </div>
