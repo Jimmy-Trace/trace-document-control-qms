@@ -10,6 +10,7 @@ export type WorkspaceVisibility = {
   retentionAdministration: boolean;
   recordManagement: boolean;
   recordCreate: boolean;
+  recordArchive: boolean;
   recordTypeAdministration: boolean;
 };
 
@@ -29,6 +30,7 @@ export function workspaceVisibility(permissionKeys: Iterable<string>): Workspace
     retentionAdministration: has("administration.manage"),
     recordManagement: has("record.read"),
     recordCreate: has("record.create"),
+    recordArchive: has("record.archive"),
     recordTypeAdministration: has("administration.manage"),
   };
 }
