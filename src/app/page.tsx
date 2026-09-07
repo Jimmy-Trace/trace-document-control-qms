@@ -67,6 +67,7 @@ export default async function HomePage() {
         <RecordManagementWorkspace
           canCreate={visibility.recordCreate}
           canArchive={visibility.recordArchive}
+          canExport={visibility.recordExport}
           canConfigureTypes={visibility.recordTypeAdministration}
         />
       )}
