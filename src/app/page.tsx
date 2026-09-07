@@ -48,6 +48,7 @@ export default async function HomePage() {
   const visibility = workspaceVisibility(
     session.user.roles.flatMap(({ role }) => role.permissions.map(({ permission }) => permission.key)),
   );
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <>
@@ -74,7 +75,7 @@ export default async function HomePage() {
         />
       )}
       {visibility.personnelManagement && <PersonnelManagementWorkspace canManage={visibility.personnelManage} />}
-      {visibility.personnelManagement && <PersonnelCredentialWorkspace canManage={visibility.personnelManage} />}
+      {visibility.personnelManagement && <PersonnelCredentialWorkspace canManage={visibility.personnelManage} today={today} />}
     </>
   );
 }
