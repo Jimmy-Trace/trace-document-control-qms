@@ -12,12 +12,18 @@ function context(permission: string): AuthorizationContext {
   return { userId, organizationId, userState: "ACTIVE", grants: [{ permission, scopeType: "ORGANIZATION", scopeId: null }] };
 }
 
+function assignment(input: { assignedAt: Date; dueAt: Date | null; actorUserId: string }) {
+  return { id: assignmentId, organizationId, employeeId, courseId, assignedAt: input.assignedAt, dueAt: input.dueAt, status: "ASSIGNED" as const, createdByUserId: input.actorUserId, createdAt: new Date(), updatedAt: new Date() };
+}
+
 function store(): TrainingStore {
   return {
     async listCourses() { return []; },
     async createCourse(input) { return { id: courseId, organizationId: input.organizationId, code: input.code, title: input.title, description: input.description, active: true, createdAt: new Date(), updatedAt: new Date() }; },
     async listAssignments() { return []; },
-    async createAssignment(input) { return { id: assignmentId, organizationId: input.organizationId, employeeId: input.employeeId, courseId: input.courseId, assignedAt: input.assignedAt, dueAt: input.dueAt, status: "ASSIGNED", createdByUserId: input.actorUserId, createdAt: new Date(), updatedAt: new Date() }; },
+    async createAssignment(input) { return assignment(input); },
+    async cancelAssignment(input) { return { ...assignment({ assignedAt: new Date(), dueAt: null, actorUserId: input.actorUserId }), status: "CANCELLED" as const, cancelReason: input.reason, cancelledAt: new Date(), cancelledByUserId: input.actorUserId }; },
+    async reassignAssignment(input) { return assignment(input); },
     async completeAssignment(input) { return { id: "66666666-6666-4666-8666-666666666666", organizationId: input.organizationId, assignmentId: input.assignmentId, employeeId, courseId, completedAt: input.completedAt, result: input.result, fileId: input.fileId, createdByUserId: input.actorUserId, createdAt: new Date() }; },
   };
 }
@@ -44,6 +50,16 @@ describe("training service", () => {
   it("rejects due dates before assignment date", () => {
     const service = new TrainingService(store());
     expect(() => service.createAssignment(context("training.manage"), { organizationId, employeeId, courseId, assignedAt: new Date("2026-09-07T00:00:00Z"), dueAt: new Date("2026-09-06T00:00:00Z") })).toThrow(TrainingValidationError);
+  });
+
+  it("requires a cancellation reason", () => {
+    const service = new TrainingService(store());
+    expect(() => service.cancelAssignment(context("training.manage"), { organizationId, assignmentId, reason: "   " })).toThrow(TrainingValidationError);
+  });
+
+  it("validates reassignment dates", () => {
+    const service = new TrainingService(store());
+    expect(() => service.reassignAssignment(context("training.manage"), { organizationId, assignmentId, assignedAt: new Date("2026-09-07T00:00:00Z"), dueAt: new Date("2026-09-06T00:00:00Z"), reason: "Schedule correction" })).toThrow(TrainingValidationError);
   });
 
   it("requires training.manage for completion", () => {

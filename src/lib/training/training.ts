@@ -8,7 +8,7 @@ export type TrainingCourseRecord = {
   id: string; organizationId: string; code: string; title: string; description: string | null; active: boolean; createdAt: Date; updatedAt: Date;
 };
 export type TrainingAssignmentRecord = {
-  id: string; organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt: Date | null; status: "ASSIGNED" | "COMPLETED" | "CANCELLED"; createdByUserId: string; createdAt: Date; updatedAt: Date;
+  id: string; organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt: Date | null; status: "ASSIGNED" | "COMPLETED" | "CANCELLED"; createdByUserId: string; createdAt: Date; updatedAt: Date; cancelledAt?: Date | null; cancelReason?: string | null; cancelledByUserId?: string | null;
 };
 export type TrainingCompletionRecord = {
   id: string; organizationId: string; assignmentId: string; employeeId: string; courseId: string; completedAt: Date; result: string | null; fileId: string | null; createdByUserId: string; createdAt: Date;
@@ -19,6 +19,8 @@ export interface TrainingStore {
   createCourse(input: { organizationId: string; code: string; title: string; description: string | null; actorUserId: string }): Promise<TrainingCourseRecord>;
   listAssignments(organizationId: string, employeeId?: string): Promise<TrainingAssignmentRecord[]>;
   createAssignment(input: { organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt: Date | null; actorUserId: string }): Promise<TrainingAssignmentRecord>;
+  cancelAssignment(input: { organizationId: string; assignmentId: string; reason: string; actorUserId: string }): Promise<TrainingAssignmentRecord>;
+  reassignAssignment(input: { organizationId: string; assignmentId: string; assignedAt: Date; dueAt: Date | null; reason: string; actorUserId: string }): Promise<TrainingAssignmentRecord>;
   completeAssignment(input: { organizationId: string; assignmentId: string; completedAt: Date; result: string | null; fileId: string | null; actorUserId: string }): Promise<TrainingCompletionRecord>;
 }
 
@@ -49,10 +51,24 @@ export class TrainingService {
   createAssignment(context: AuthorizationContext, input: { organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt?: Date | null }) {
     requireAuthorization(context, { organizationId: input.organizationId, permission: "training.manage" });
     const dueAt = input.dueAt ?? null;
-    if (Number.isNaN(input.assignedAt.getTime())) throw new TrainingValidationError("Training assignment date is invalid");
-    if (dueAt && Number.isNaN(dueAt.getTime())) throw new TrainingValidationError("Training due date is invalid");
-    if (dueAt && dueAt < input.assignedAt) throw new TrainingValidationError("Training due date cannot precede assignment date");
+    validateAssignmentDates(input.assignedAt, dueAt);
     return this.store.createAssignment({ organizationId: input.organizationId, employeeId: input.employeeId, courseId: input.courseId, assignedAt: input.assignedAt, dueAt, actorUserId: context.userId });
+  }
+
+  cancelAssignment(context: AuthorizationContext, input: { organizationId: string; assignmentId: string; reason: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "training.manage" });
+    const reason = input.reason.trim();
+    if (!reason || reason.length > 500) throw new TrainingValidationError("Training cancellation reason is required");
+    return this.store.cancelAssignment({ organizationId: input.organizationId, assignmentId: input.assignmentId, reason, actorUserId: context.userId });
+  }
+
+  reassignAssignment(context: AuthorizationContext, input: { organizationId: string; assignmentId: string; assignedAt: Date; dueAt?: Date | null; reason: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "training.manage" });
+    const dueAt = input.dueAt ?? null;
+    const reason = input.reason.trim();
+    validateAssignmentDates(input.assignedAt, dueAt);
+    if (!reason || reason.length > 500) throw new TrainingValidationError("Training reassignment reason is required");
+    return this.store.reassignAssignment({ organizationId: input.organizationId, assignmentId: input.assignmentId, assignedAt: input.assignedAt, dueAt, reason, actorUserId: context.userId });
   }
 
   completeAssignment(context: AuthorizationContext, input: { organizationId: string; assignmentId: string; completedAt: Date; result?: string | null; fileId?: string | null }) {
@@ -62,4 +78,10 @@ export class TrainingService {
     if ((result?.length ?? 0) > 500) throw new TrainingValidationError("Training result is too long");
     return this.store.completeAssignment({ organizationId: input.organizationId, assignmentId: input.assignmentId, completedAt: input.completedAt, result, fileId: input.fileId ?? null, actorUserId: context.userId });
   }
+}
+
+function validateAssignmentDates(assignedAt: Date, dueAt: Date | null) {
+  if (Number.isNaN(assignedAt.getTime())) throw new TrainingValidationError("Training assignment date is invalid");
+  if (dueAt && Number.isNaN(dueAt.getTime())) throw new TrainingValidationError("Training due date is invalid");
+  if (dueAt && dueAt < assignedAt) throw new TrainingValidationError("Training due date cannot precede assignment date");
 }
