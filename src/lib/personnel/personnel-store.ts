@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
-import type { EmployeeJobAssignmentRecord, EmployeeRecord, JobDescriptionRecord, PersonnelStore } from "./personnel";
+import type { EmployeeJobAssignmentRecord, EmployeeRecord, EmployeeStatus, JobDescriptionRecord, PersonnelStore } from "./personnel";
 import { PersonnelEligibilityError, PersonnelValidationError } from "./personnel";
 
 export class PrismaPersonnelStore implements PersonnelStore {
@@ -44,6 +44,64 @@ export class PrismaPersonnelStore implements PersonnelStore {
         metadata: { employeeNumber: employee.employeeNumber, userId: employee.userId, status: employee.status, hireDate: employee.hireDate?.toISOString() ?? null },
       }});
       return employee;
+    });
+  }
+
+  async transitionEmployee(input: { organizationId: string; employeeId: string; targetStatus: EmployeeStatus; effectiveDate: Date | null; reason: string; actorUserId: string }): Promise<EmployeeRecord> {
+    return db.$transaction(async (tx) => {
+      const currentRows = await tx.$queryRaw<EmployeeRecord[]>(Prisma.sql`
+        SELECT * FROM "Employee"
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.employeeId}::uuid
+        FOR UPDATE
+      `);
+      const current = currentRows[0];
+      if (!current) throw new Error("Access denied");
+      if (current.status === "TERMINATED") throw new PersonnelEligibilityError("Terminated employees cannot be reactivated or changed");
+      if (current.status === input.targetStatus) throw new PersonnelEligibilityError("Employee is already in the requested status");
+      if (input.targetStatus === "TERMINATED" && input.effectiveDate && current.hireDate && input.effectiveDate < current.hireDate) {
+        throw new PersonnelValidationError("Termination date cannot precede hire date");
+      }
+
+      const terminationDate = input.targetStatus === "TERMINATED" ? input.effectiveDate : null;
+      const updatedRows = await tx.$queryRaw<EmployeeRecord[]>(Prisma.sql`
+        UPDATE "Employee"
+        SET "status" = ${input.targetStatus}::"EmployeeStatus",
+            "terminationDate" = ${terminationDate},
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.employeeId}::uuid
+        RETURNING *
+      `);
+      const updated = updatedRows[0]!;
+
+      let closedAssignments: Array<{ id: string }> = [];
+      if (input.targetStatus === "TERMINATED" && terminationDate) {
+        closedAssignments = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+          UPDATE "EmployeeJobAssignment"
+          SET "endedAt" = ${terminationDate}
+          WHERE "organizationId" = ${input.organizationId}::uuid
+            AND "employeeId" = ${input.employeeId}::uuid
+            AND "endedAt" IS NULL
+            AND "assignedAt" <= ${terminationDate}
+          RETURNING "id"
+        `);
+      }
+
+      await tx.auditEvent.create({ data: {
+        organizationId: input.organizationId,
+        actorUserId: input.actorUserId,
+        action: "EMPLOYEE_STATUS_CHANGED",
+        entityType: "Employee",
+        entityId: updated.id,
+        entityVersion: updated.employeeNumber,
+        metadata: {
+          fromStatus: current.status,
+          toStatus: updated.status,
+          effectiveDate: input.effectiveDate?.toISOString() ?? null,
+          reason: input.reason,
+          closedAssignmentIds: closedAssignments.map((assignment) => assignment.id),
+        },
+      }});
+      return updated;
     });
   }
 
@@ -154,6 +212,43 @@ export class PrismaPersonnelStore implements PersonnelStore {
         },
       }});
       return assignment;
+    });
+  }
+
+  async endAssignment(input: { organizationId: string; assignmentId: string; endedAt: Date; reason: string; actorUserId: string }): Promise<EmployeeJobAssignmentRecord> {
+    return db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<EmployeeJobAssignmentRecord[]>(Prisma.sql`
+        SELECT * FROM "EmployeeJobAssignment"
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.assignmentId}::uuid
+        FOR UPDATE
+      `);
+      const current = rows[0];
+      if (!current) throw new Error("Access denied");
+      if (current.endedAt) throw new PersonnelEligibilityError("Job assignment has already ended");
+      if (input.endedAt < current.assignedAt) throw new PersonnelValidationError("Assignment end date cannot precede assignment date");
+
+      const updatedRows = await tx.$queryRaw<EmployeeJobAssignmentRecord[]>(Prisma.sql`
+        UPDATE "EmployeeJobAssignment"
+        SET "endedAt" = ${input.endedAt}
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.assignmentId}::uuid
+        RETURNING *
+      `);
+      const updated = updatedRows[0]!;
+      await tx.auditEvent.create({ data: {
+        organizationId: input.organizationId,
+        actorUserId: input.actorUserId,
+        action: "EMPLOYEE_JOB_ASSIGNMENT_ENDED",
+        entityType: "EmployeeJobAssignment",
+        entityId: updated.id,
+        metadata: {
+          employeeId: updated.employeeId,
+          jobDescriptionId: updated.jobDescriptionId,
+          assignedAt: updated.assignedAt.toISOString(),
+          endedAt: updated.endedAt?.toISOString() ?? null,
+          reason: input.reason,
+        },
+      }});
+      return updated;
     });
   }
 }
