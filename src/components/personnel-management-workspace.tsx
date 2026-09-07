@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; status: "ACTIVE" | "INACTIVE" | "TERMINATED"; hireDate: string | null };
+type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; status: "ACTIVE" | "INACTIVE" | "TERMINATED"; hireDate: string | null; terminationDate: string | null };
 type Job = { id: string; code: string; title: string; summary: string | null; active: boolean };
 type Assignment = { id: string; employeeId: string; jobDescriptionId: string; siteId: string | null; departmentId: string | null; isPrimary: boolean; assignedAt: string; endedAt: string | null };
 
@@ -97,6 +97,39 @@ export function PersonnelManagementWorkspace({ canManage }: { canManage: boolean
     event.currentTarget.reset(); setNotice("Job assignment created with audit evidence."); await load();
   }
 
+  async function changeStatus(employee: Employee, targetStatus: "ACTIVE" | "INACTIVE" | "TERMINATED") {
+    const reason = window.prompt(`Change ${employee.employeeNumber} from ${employee.status} to ${targetStatus}. Enter the controlled reason:`);
+    if (!reason?.trim()) return;
+    let effectiveDate: string | null = null;
+    if (targetStatus === "TERMINATED") {
+      effectiveDate = window.prompt("Enter the termination date (YYYY-MM-DD):");
+      if (!effectiveDate?.trim()) return;
+    }
+    setBusy(true); setNotice("");
+    const response = await fetch("/api/personnel", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "SET_STATUS", employeeId: employee.id, targetStatus, effectiveDate, reason }),
+    });
+    const body = await response.json().catch(() => null); setBusy(false);
+    if (!response.ok) return setNotice(body?.error || "Personnel status could not be changed.");
+    setNotice(`Employee ${employee.employeeNumber} changed to ${body.data.status} with audit evidence.`); await load();
+  }
+
+  async function endAssignment(assignment: Assignment) {
+    const endedAt = window.prompt("Enter the assignment end date (YYYY-MM-DD):");
+    if (!endedAt?.trim()) return;
+    const reason = window.prompt("Enter the controlled assignment end reason:");
+    if (!reason?.trim()) return;
+    setBusy(true); setNotice("");
+    const response = await fetch("/api/personnel/assignments", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "END", assignmentId: assignment.id, endedAt, reason }),
+    });
+    const body = await response.json().catch(() => null); setBusy(false);
+    if (!response.ok) return setNotice(body?.error || "Job assignment could not be ended.");
+    setNotice("Job assignment ended with audit evidence."); await load();
+  }
+
   return <section className="workspace-section" aria-labelledby="personnel-management-heading">
     <div className="section-heading"><div><p className="eyebrow">Personnel</p><h2 id="personnel-management-heading">Personnel management</h2><p>Maintain governed employee identities, job descriptions, and historical job assignments separately from login accounts.</p></div></div>
 
@@ -125,12 +158,23 @@ export function PersonnelManagementWorkspace({ canManage }: { canManage: boolean
 
     {notice && <p role="status">{notice}</p>}
     <label>Search personnel<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Employee number, name, or status" /></label>
-    <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Name</th><th>Status</th><th>Hire date</th><th>Active assignments</th></tr></thead><tbody>
+    <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Name</th><th>Status</th><th>Hire date</th><th>Active assignments</th><th>Actions</th></tr></thead><tbody>
       {visibleEmployees.map((employee) => {
         const active = assignments.filter((assignment) => assignment.employeeId === employee.id && !assignment.endedAt);
-        return <tr key={employee.id}><td>{employee.employeeNumber}</td><td>{employee.lastName}, {employee.firstName}</td><td>{employee.status}</td><td>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : "—"}</td><td>{active.length ? active.map((assignment) => { const job = jobById.get(assignment.jobDescriptionId); return `${job?.code ?? assignment.jobDescriptionId}${assignment.isPrimary ? " (Primary)" : ""}`; }).join(", ") : "—"}</td></tr>;
+        return <tr key={employee.id}>
+          <td>{employee.employeeNumber}</td>
+          <td>{employee.lastName}, {employee.firstName}</td>
+          <td>{employee.status}{employee.terminationDate ? ` · ${new Date(employee.terminationDate).toLocaleDateString()}` : ""}</td>
+          <td>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : "—"}</td>
+          <td>{active.length ? active.map((assignment) => { const job = jobById.get(assignment.jobDescriptionId); return <span key={assignment.id}>{job?.code ?? assignment.jobDescriptionId}{assignment.isPrimary ? " (Primary)" : ""}{canManage && <button type="button" disabled={busy} onClick={() => void endAssignment(assignment)}>End</button>}</span>; }) : "—"}</td>
+          <td>{canManage && employee.status !== "TERMINATED" ? <>
+            {employee.status !== "ACTIVE" && <button type="button" disabled={busy} onClick={() => void changeStatus(employee, "ACTIVE")}>Activate</button>}
+            {employee.status !== "INACTIVE" && <button type="button" disabled={busy} onClick={() => void changeStatus(employee, "INACTIVE")}>Inactivate</button>}
+            <button type="button" disabled={busy} onClick={() => void changeStatus(employee, "TERMINATED")}>Terminate</button>
+          </> : "—"}</td>
+        </tr>;
       })}
-      {!visibleEmployees.length && <tr><td colSpan={5}>{employees.length ? "No personnel match the current search." : "No governed personnel records have been created."}</td></tr>}
+      {!visibleEmployees.length && <tr><td colSpan={6}>{employees.length ? "No personnel match the current search." : "No governed personnel records have been created."}</td></tr>}
     </tbody></table></div>
   </section>;
 }
