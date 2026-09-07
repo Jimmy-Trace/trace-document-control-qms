@@ -2,7 +2,35 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { AuditHistory } from "./audit-history";
-type AdminData = { organization: { displayName: string; loginCode: string }; sites: Array<{ id: string; name: string }>; departments: Array<{ id: string; name: string; siteId: string | null }>; users: Array<{ id: string; email: string; firstName: string; lastName: string; status: string; roles: Array<{ roleId: string }> }>; roles: Array<{ id: string; name: string; permissions: Array<{ permission: { key: string } }> }>; permissions: Array<{ key: string }>; documentTypes: Array<{ id: string; code: string; name: string; reviewMonths: number | null; active: boolean }> };
+type AdminData = { organization: { displayName: string; loginCode: string }; sites: Array<{ id: string; name: string }>; departments: Array<{ id: string; name: string; siteId: string | null }>; users: Array<{ id: string; email: string; firstName: string; lastName: string; status: string; roles: Array<{ roleId: string }> }>; roles: Array<{ id: string; name: string; permissions: Array<{ permission: { key: string } }> }>; permissions: Array<{ key: string; description: string | null }>; documentTypes: Array<{ id: string; code: string; name: string; reviewMonths: number | null; active: boolean }> };
+
+function permissionDescription(permission: { key: string; description: string | null }) {
+  if (permission.description) return permission.description;
+  const known: Record<string, string> = {
+    "document.read": "View controlled documents and their version history.",
+    "document.create": "Create and edit draft controlled documents.",
+    "document.revise": "Create a successor revision from an existing controlled version.",
+    "document.submit": "Submit a draft into controlled review.",
+    "document.review": "Participate in controlled document review.",
+    "document.approve": "Approve a controlled document using the approved signature workflow.",
+    "document.make_effective": "Make an approved version effective.",
+    "document.retire": "Retire a controlled document version.",
+    "document.distribute": "Create governed acknowledgment distributions.",
+    "document.acknowledge": "Complete assigned read-and-understand acknowledgments.",
+    "document.export": "Export an exact controlled document version with audit evidence.",
+    "document.delete": "Archive eligible unlinked file objects; controlled history is not deleted.",
+    "administration.manage": "Manage organization configuration, users, roles, sites, and departments.",
+    "audit.read": "View append-only audit history.",
+    "notification.manage": "Manage notification delivery diagnostics and operations.",
+  };
+  return known[permission.key] ?? permission.key;
+}
+
+function scopePayload(value: string) {
+  if (value === "ORGANIZATION") return { scopeType: "ORGANIZATION", scopeId: null };
+  const [scopeType, scopeId] = value.split(":", 2);
+  return { scopeType, scopeId };
+}
 
 export function AccessAdministration() {
   const [data, setData] = useState<AdminData | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -15,8 +43,8 @@ export function AccessAdministration() {
     <form className="template-form" onSubmit={form("CREATE_SITE", (f) => ({ name: String(f.get("name")) }))}><strong>Add site</strong><label>Name<input name="name" required /></label><button className="primary-button">Create site</button></form>
     <form className="template-form" onSubmit={form("CREATE_DEPARTMENT", (f) => ({ name: String(f.get("name")), siteId: String(f.get("siteId")) || null }))}><strong>Add department</strong><label>Name<input name="name" required /></label><label>Site<select name="siteId"><option value="">Organization-wide</option>{data.sites.map((site) => <option value={site.id} key={site.id}>{site.name}</option>)}</select></label><button className="primary-button">Create department</button></form>
     <form className="template-form" onSubmit={form("CREATE_USER", (f) => ({ email: String(f.get("email")), firstName: String(f.get("firstName")), lastName: String(f.get("lastName")), temporaryPassword: String(f.get("temporaryPassword")) }))}><strong>Add user</strong><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label><label>Email<input name="email" type="email" required /></label><label>Temporary password<input name="temporaryPassword" type="password" minLength={12} required autoComplete="new-password" /></label><button className="primary-button">Create user</button></form>
-    <form className="template-form" onSubmit={form("CREATE_ROLE", (f) => ({ name: String(f.get("name")), permissionKeys: f.getAll("permissionKeys").map(String) }))}><strong>Add role</strong><label>Name<input name="name" required /></label><fieldset><legend>Permissions</legend>{data.permissions.map((permission) => <label key={permission.key}><input type="checkbox" name="permissionKeys" value={permission.key} /> {permission.key}</label>)}</fieldset><button className="primary-button">Create role</button></form>
-    <form className="template-form" onSubmit={form("ASSIGN_ROLE", (f) => ({ userId: String(f.get("userId")), roleId: String(f.get("roleId")) }))}><strong>Assign role</strong><label>User<select name="userId" required>{data.users.map((user) => <option value={user.id} key={user.id}>{user.firstName} {user.lastName} · {user.email}</option>)}</select></label><label>Role<select name="roleId" required>{data.roles.map((role) => <option value={role.id} key={role.id}>{role.name}</option>)}</select></label><button className="primary-button">Assign role</button></form>
+    <form className="template-form" onSubmit={form("CREATE_ROLE", (f) => ({ name: String(f.get("name")), permissionKeys: f.getAll("permissionKeys").map(String) }))}><strong>Add role</strong><label>Name<input name="name" required /></label><fieldset><legend>Permissions</legend>{data.permissions.map((permission) => <label key={permission.key}><span><input type="checkbox" name="permissionKeys" value={permission.key} /> <strong>{permission.key}</strong></span><small>{permissionDescription(permission)}</small></label>)}</fieldset><button className="primary-button">Create role</button></form>
+    <form className="template-form" onSubmit={form("ASSIGN_ROLE", (f) => ({ userId: String(f.get("userId")), roleId: String(f.get("roleId")), ...scopePayload(String(f.get("scopeTarget"))) }))}><strong>Assign role</strong><p>Choose the smallest scope required. Reassigning the same role updates its scope.</p><label>User<select name="userId" required>{data.users.map((user) => <option value={user.id} key={user.id}>{user.firstName} {user.lastName} · {user.email}</option>)}</select></label><label>Role<select name="roleId" required>{data.roles.map((role) => <option value={role.id} key={role.id}>{role.name}</option>)}</select></label><label>Scope<select name="scopeTarget" required><option value="ORGANIZATION">Entire organization</option>{data.sites.map((site) => <option value={`SITE:${site.id}`} key={`site-${site.id}`}>Site · {site.name}</option>)}{data.departments.map((department) => <option value={`DEPARTMENT:${department.id}`} key={`department-${department.id}`}>Department · {department.name}</option>)}</select></label><button className="primary-button">Assign scoped role</button></form>
     <form className="template-form" onSubmit={form("CREATE_DOCUMENT_TYPE", (f) => ({ code: String(f.get("code")), name: String(f.get("name")), reviewMonths: String(f.get("reviewMonths") || "").trim() ? Number(f.get("reviewMonths")) : null }))}><strong>Add document type</strong><label>Code<input name="code" required maxLength={30} placeholder="SOP" /></label><label>Name<input name="name" required maxLength={120} placeholder="Procedure" /></label><label>Review interval (months)<input name="reviewMonths" type="number" min={1} max={120} /></label><button className="primary-button">Create document type</button></form>
   </div><div className="detail-section"><h3>Document types</h3>{data.documentTypes.length === 0 ? <p>No document types configured. Create one above before starting a controlled document.</p> : <div className="template-layout">{data.documentTypes.map((type) => <div className="template-form" key={type.id}><strong>{type.code} · {type.name}</strong><p>{type.reviewMonths ? `Review every ${type.reviewMonths} months` : "No default review interval"} · {type.active ? "Active" : "Inactive"}</p><form onSubmit={form("UPDATE_DOCUMENT_TYPE_REVIEW_INTERVAL", (f) => ({ documentTypeId: type.id, reviewMonths: Number(f.get("reviewMonths")) }))}><label>Review interval (months)<input name="reviewMonths" type="number" min={1} max={120} defaultValue={type.reviewMonths ?? ""} required /></label><button className="secondary-button">Save review interval</button></form><button type="button" className="secondary-button" onClick={() => command({ operation: "SET_DOCUMENT_TYPE_ACTIVE", documentTypeId: type.id, active: !type.active })}>{type.active ? "Deactivate" : "Activate"}</button></div>)}</div>}</div></section><AuditHistory /></>;
 }

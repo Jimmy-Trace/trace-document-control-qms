@@ -7,6 +7,7 @@ import { requireAuthorization } from "@/lib/security/authorization";
 import { hashPassword } from "@/lib/security/crypto";
 
 const uuid = z.string().uuid();
+const scopeType = z.enum(["ORGANIZATION", "SITE", "DEPARTMENT"]);
 const documentTypeCode = z.string().trim().min(1).max(30).regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/).transform((value) => value.toUpperCase());
 const reviewMonths = z.number().int().min(1).max(120).nullable();
 const schema = z.discriminatedUnion("operation", [
@@ -15,7 +16,7 @@ const schema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("CREATE_DEPARTMENT"), name: z.string().trim().min(2).max(120), siteId: uuid.nullable() }),
   z.object({ operation: z.literal("CREATE_USER"), email: z.string().trim().toLowerCase().email().max(254), firstName: z.string().trim().min(1).max(80), lastName: z.string().trim().min(1).max(80), temporaryPassword: z.string().min(12).max(1024) }),
   z.object({ operation: z.literal("CREATE_ROLE"), name: z.string().trim().min(2).max(100), permissionKeys: z.array(z.string().min(1)).min(1).max(100) }),
-  z.object({ operation: z.literal("ASSIGN_ROLE"), userId: uuid, roleId: uuid }),
+  z.object({ operation: z.literal("ASSIGN_ROLE"), userId: uuid, roleId: uuid, scopeType, scopeId: uuid.nullable() }),
   z.object({ operation: z.literal("CREATE_DOCUMENT_TYPE"), code: documentTypeCode, name: z.string().trim().min(2).max(120), reviewMonths }),
   z.object({ operation: z.literal("UPDATE_DOCUMENT_TYPE_REVIEW_INTERVAL"), documentTypeId: uuid, reviewMonths }),
   z.object({ operation: z.literal("SET_DOCUMENT_TYPE_ACTIVE"), documentTypeId: uuid, active: z.boolean() }),
@@ -46,7 +47,20 @@ export async function POST(request: NextRequest) {
       } else if (input.operation === "ASSIGN_ROLE") {
         const [user, role] = await Promise.all([tx.user.findFirst({ where: { id: input.userId, organizationId: context.organizationId } }), tx.role.findFirst({ where: { id: input.roleId, organizationId: context.organizationId } })]);
         if (!user || !role) throw new Error("Access denied");
-        await tx.userRole.upsert({ where: { organizationId_userId_roleId: { organizationId: context.organizationId, userId: user.id, roleId: role.id } }, update: {}, create: { organizationId: context.organizationId, userId: user.id, roleId: role.id, assignedBy: context.userId } }); entityType = "UserRole"; entityId = user.id; metadata = { ...metadata, roleId: role.id };
+        if (input.scopeType === "ORGANIZATION") {
+          if (input.scopeId !== null) throw new Error("Invalid role scope");
+        } else if (input.scopeType === "SITE") {
+          if (!input.scopeId || !await tx.site.findFirst({ where: { id: input.scopeId, organizationId: context.organizationId, active: true } })) throw new Error("Invalid role scope");
+        } else if (!input.scopeId || !await tx.department.findFirst({ where: { id: input.scopeId, organizationId: context.organizationId, active: true } })) {
+          throw new Error("Invalid role scope");
+        }
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO "UserRole" ("organizationId","userId","roleId","assignedAt","assignedBy","scopeType","scopeId")
+          VALUES (${context.organizationId}::uuid,${user.id}::uuid,${role.id}::uuid,CURRENT_TIMESTAMP,${context.userId}::uuid,${input.scopeType},${input.scopeId}::uuid)
+          ON CONFLICT ("organizationId","userId","roleId") DO UPDATE
+          SET "assignedAt"=CURRENT_TIMESTAMP,"assignedBy"=EXCLUDED."assignedBy","scopeType"=EXCLUDED."scopeType","scopeId"=EXCLUDED."scopeId"
+        `);
+        entityType = "UserRole"; entityId = user.id; metadata = { ...metadata, roleId: role.id, scopeType: input.scopeType, scopeId: input.scopeId };
       } else if (input.operation === "CREATE_DOCUMENT_TYPE") {
         const duplicate = await tx.documentType.findFirst({ where: { organizationId: context.organizationId, OR: [{ code: input.code }, { name: { equals: input.name, mode: "insensitive" } }] }, select: { id: true } });
         if (duplicate) throw new Error("Document type already exists");
@@ -72,6 +86,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message === "Access denied") return NextResponse.json({ error: "Access denied" }, { status: 403 });
     if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid administration request" }, { status: 400 });
     if (error instanceof Error && error.message === "Document type already exists") return NextResponse.json({ error: "A document type with that code or name already exists." }, { status: 409 });
+    if (error instanceof Error && error.message === "Invalid role scope") return NextResponse.json({ error: "The selected role scope is invalid or inactive." }, { status: 409 });
     return NextResponse.json({ error: "Administration change could not be completed" }, { status: 409 });
   }
 }
