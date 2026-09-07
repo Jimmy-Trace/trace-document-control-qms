@@ -51,6 +51,39 @@ export class PrismaFolderStore implements FolderStore {
     }).catch((error) => { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new FolderValidationError("A sibling folder with that name already exists"); throw error; });
   }
 
+  async moveFolder(input: { organizationId: string; folderId: string; parentFolderId: string | null; actorUserId: string; occurredAt: Date }) {
+    await db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ id: string; parentFolderId: string | null; name: string }>>(Prisma.sql`SELECT "id", "parentFolderId", "name" FROM "DocumentFolder" WHERE "organizationId"=${input.organizationId}::uuid`);
+      const folder = rows.find((row) => row.id === input.folderId);
+      if (!folder) throw new Error("Access denied");
+      if (input.parentFolderId === input.folderId) throw new FolderValidationError("A folder cannot be its own parent");
+      if (input.parentFolderId && !rows.some((row) => row.id === input.parentFolderId)) throw new Error("Access denied");
+      let current = input.parentFolderId;
+      const seen = new Set<string>();
+      while (current) {
+        if (current === input.folderId) throw new FolderValidationError("A folder cannot be moved into one of its descendants");
+        if (seen.has(current)) throw new FolderValidationError("Folder hierarchy is invalid");
+        seen.add(current);
+        current = rows.find((row) => row.id === current)?.parentFolderId ?? null;
+      }
+      await tx.$executeRaw(Prisma.sql`UPDATE "DocumentFolder" SET "parentFolderId"=${input.parentFolderId}::uuid, "updatedAt"=${input.occurredAt} WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.folderId}::uuid`);
+      await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "DOCUMENT_FOLDER_MOVED", entityType: "DocumentFolder", entityId: input.folderId, occurredAt: input.occurredAt, metadata: { priorParentFolderId: folder.parentFolderId, parentFolderId: input.parentFolderId } as Prisma.InputJsonValue } });
+    }).catch((error) => { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new FolderValidationError("A sibling folder with that name already exists"); throw error; });
+  }
+
+  async deleteFolder(input: { organizationId: string; folderId: string; actorUserId: string; occurredAt: Date }) {
+    await db.$transaction(async (tx) => {
+      const folders = await tx.$queryRaw<Array<{ id: string; parentFolderId: string | null; name: string }>>(Prisma.sql`SELECT "id", "parentFolderId", "name" FROM "DocumentFolder" WHERE "organizationId"=${input.organizationId}::uuid`);
+      const folder = folders.find((row) => row.id === input.folderId);
+      if (!folder) throw new Error("Access denied");
+      if (folders.some((row) => row.parentFolderId === input.folderId)) throw new FolderValidationError("Folder must have no subfolders before deletion");
+      const placements = await tx.$queryRaw<Array<{ documentId: string }>>(Prisma.sql`SELECT "documentId" FROM "DocumentFolderPlacement" WHERE "organizationId"=${input.organizationId}::uuid AND "folderId"=${input.folderId}::uuid LIMIT 1`);
+      if (placements.length) throw new FolderValidationError("Folder must contain no documents before deletion");
+      await tx.$executeRaw(Prisma.sql`DELETE FROM "DocumentFolder" WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.folderId}::uuid`);
+      await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "DOCUMENT_FOLDER_DELETED", entityType: "DocumentFolder", entityId: input.folderId, occurredAt: input.occurredAt, metadata: { name: folder.name, parentFolderId: folder.parentFolderId } as Prisma.InputJsonValue } });
+    });
+  }
+
   async placeDocument(input: { organizationId: string; documentId: string; folderId: string; actorUserId: string; occurredAt: Date }) {
     await db.$transaction(async (tx) => {
       const [document, folder, prior] = await Promise.all([
