@@ -42,7 +42,24 @@ export function ControlledCopyAdministration() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void Promise.all([
+      fetch("/api/documents/controlled-copies", { credentials: "same-origin" }),
+      fetch("/api/documents?status=EFFECTIVE&limit=100", { credentials: "same-origin" }),
+    ]).then(async ([copiesResponse, versionsResponse]) => {
+      if (cancelled) return;
+      if (copiesResponse.ok) {
+        const body = await copiesResponse.json();
+        if (!cancelled) setCopies(body.data ?? []);
+      }
+      if (versionsResponse.ok) {
+        const body = await versionsResponse.json();
+        if (!cancelled) setVersions(body.data?.items ?? []);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function issue(event: FormEvent<HTMLFormElement>) {
