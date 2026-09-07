@@ -101,10 +101,7 @@ const commandPermissions: Record<DocumentCommand, string> = {
   APPROVE: "document.approve",
   REJECT: "document.review",
   MAKE_EFFECTIVE: "document.make_effective",
-  // Phase 2 granular document.retire permission is introduced during RBAC
-  // hardening (Prompt 044). Until then, retirement is limited to the same
-  // controlled-document authority that can make a version effective.
-  RETIRE: "document.make_effective",
+  RETIRE: "document.retire",
 };
 
 export class DocumentCommandService {
@@ -263,10 +260,7 @@ export class DocumentCommandService {
   ) {
     requireAuthorization(context, {
       organizationId: input.organizationId,
-      // Prompt 044 will split document creation and revision into distinct
-      // granular permissions. Preserve the existing validated permission until
-      // that RBAC migration is deployed.
-      permission: "document.create",
+      permission: "document.revise",
     });
     if (!input.revisionLabel.trim())
       throw new DocumentCommandError("Revision label is required");
