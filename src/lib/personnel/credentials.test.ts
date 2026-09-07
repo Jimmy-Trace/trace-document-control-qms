@@ -38,9 +38,9 @@ describe("personnel credential service", () => {
     expect(() => service.listCredentials({ ...context("personnel.read"), grants: [] }, organizationId)).toThrow("Access denied");
   });
 
-  it("requires personnel.manage for credential creation", async () => {
+  it("requires personnel.manage for credential creation", () => {
     const service = new PersonnelCredentialService(store());
-    await expect(service.createCredential(context("personnel.read"), { organizationId, employeeId, credentialType: "License" })).rejects.toThrow("Access denied");
+    expect(() => service.createCredential(context("personnel.read"), { organizationId, employeeId, credentialType: "License" })).toThrow("Access denied");
   });
 
   it("normalizes credential details and preserves expiration", async () => {
@@ -57,14 +57,14 @@ describe("personnel credential service", () => {
     expect(result.expiresAt?.toISOString()).toBe("2027-01-01T00:00:00.000Z");
   });
 
-  it("rejects invalid credential date ranges", async () => {
+  it("rejects invalid credential date ranges", () => {
     const service = new PersonnelCredentialService(store());
-    await expect(service.createCredential(context("personnel.manage"), {
+    expect(() => service.createCredential(context("personnel.manage"), {
       organizationId,
       employeeId,
       credentialType: "License",
       issuedAt: new Date("2027-01-01T00:00:00Z"),
       expiresAt: new Date("2026-01-01T00:00:00Z"),
-    })).rejects.toBeInstanceOf(PersonnelValidationError);
+    })).toThrow(PersonnelValidationError);
   });
 });
