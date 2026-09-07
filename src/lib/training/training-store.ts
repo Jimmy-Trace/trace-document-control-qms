@@ -32,36 +32,49 @@ export class PrismaTrainingStore implements TrainingStore {
   }
 
   async createAssignment(input: { organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt: Date | null; actorUserId: string }): Promise<TrainingAssignmentRecord> {
+    return db.$transaction(async (tx) => this.createAssignmentInTransaction(tx, input));
+  }
+
+  async cancelAssignment(input: { organizationId: string; assignmentId: string; reason: string; actorUserId: string }): Promise<TrainingAssignmentRecord> {
     return db.$transaction(async (tx) => {
-      const employees = await tx.$queryRaw<Array<{ status: string }>>(Prisma.sql`
-        SELECT "status"::text AS "status" FROM "Employee" WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.employeeId}::uuid
-      `);
-      if (!employees[0]) throw new Error("Access denied");
-      if (employees[0].status === "TERMINATED") throw new TrainingEligibilityError("Training cannot be assigned to a terminated employee");
-      const courses = await tx.$queryRaw<Array<{ active: boolean }>>(Prisma.sql`
-        SELECT "active" FROM "TrainingCourse" WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.courseId}::uuid
-      `);
-      if (!courses[0]) throw new Error("Access denied");
-      if (!courses[0].active) throw new TrainingEligibilityError("Inactive training course cannot be assigned");
+      const assignment = await this.lockAssignable(tx, input.organizationId, input.assignmentId);
       const rows = await tx.$queryRaw<TrainingAssignmentRecord[]>(Prisma.sql`
-        INSERT INTO "TrainingAssignment" ("organizationId", "employeeId", "courseId", "assignedAt", "dueAt", "createdByUserId")
-        VALUES (${input.organizationId}::uuid, ${input.employeeId}::uuid, ${input.courseId}::uuid, ${input.assignedAt}, ${input.dueAt}, ${input.actorUserId}::uuid) RETURNING *
+        UPDATE "TrainingAssignment"
+        SET "status" = 'CANCELLED', "cancelledAt" = CURRENT_TIMESTAMP, "cancelReason" = ${input.reason}, "cancelledByUserId" = ${input.actorUserId}::uuid, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${assignment.id}::uuid
+        RETURNING *
       `);
-      const assignment = rows[0];
-      if (!assignment) throw new TrainingValidationError("Training assignment could not be created");
-      await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "TRAINING_ASSIGNED", entityType: "TrainingAssignment", entityId: assignment.id, metadata: { employeeId: assignment.employeeId, courseId: assignment.courseId, dueAt: assignment.dueAt?.toISOString() ?? null } } });
-      return assignment;
+      const cancelled = rows[0];
+      if (!cancelled) throw new TrainingValidationError("Training assignment could not be cancelled");
+      await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "TRAINING_CANCELLED", entityType: "TrainingAssignment", entityId: cancelled.id, reason: input.reason, metadata: { employeeId: cancelled.employeeId, courseId: cancelled.courseId } } });
+      return cancelled;
+    });
+  }
+
+  async reassignAssignment(input: { organizationId: string; assignmentId: string; assignedAt: Date; dueAt: Date | null; reason: string; actorUserId: string }): Promise<TrainingAssignmentRecord> {
+    return db.$transaction(async (tx) => {
+      const prior = await this.lockAssignable(tx, input.organizationId, input.assignmentId);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "TrainingAssignment"
+        SET "status" = 'CANCELLED', "cancelledAt" = CURRENT_TIMESTAMP, "cancelReason" = ${input.reason}, "cancelledByUserId" = ${input.actorUserId}::uuid, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${prior.id}::uuid
+      `);
+      const replacement = await this.createAssignmentInTransaction(tx, {
+        organizationId: input.organizationId,
+        employeeId: prior.employeeId,
+        courseId: prior.courseId,
+        assignedAt: input.assignedAt,
+        dueAt: input.dueAt,
+        actorUserId: input.actorUserId,
+      }, false);
+      await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "TRAINING_REASSIGNED", entityType: "TrainingAssignment", entityId: replacement.id, reason: input.reason, metadata: { priorAssignmentId: prior.id, employeeId: replacement.employeeId, courseId: replacement.courseId, dueAt: replacement.dueAt?.toISOString() ?? null } } });
+      return replacement;
     });
   }
 
   async completeAssignment(input: { organizationId: string; assignmentId: string; completedAt: Date; result: string | null; fileId: string | null; actorUserId: string }): Promise<TrainingCompletionRecord> {
     return db.$transaction(async (tx) => {
-      const assignments = await tx.$queryRaw<Array<TrainingAssignmentRecord>>(Prisma.sql`
-        SELECT * FROM "TrainingAssignment" WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.assignmentId}::uuid FOR UPDATE
-      `);
-      const assignment = assignments[0];
-      if (!assignment) throw new Error("Access denied");
-      if (assignment.status !== "ASSIGNED") throw new TrainingEligibilityError("Only ASSIGNED training can be completed");
+      const assignment = await this.lockAssignable(tx, input.organizationId, input.assignmentId);
       if (input.fileId) {
         const file = await tx.fileObject.findFirst({ where: { organizationId: input.organizationId, id: input.fileId }, select: { status: true } });
         if (!file) throw new Error("Access denied");
@@ -77,5 +90,36 @@ export class PrismaTrainingStore implements TrainingStore {
       await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "TRAINING_COMPLETED", entityType: "TrainingRecord", entityId: record.id, metadata: { assignmentId: record.assignmentId, employeeId: record.employeeId, courseId: record.courseId, completedAt: record.completedAt.toISOString(), fileId: record.fileId } } });
       return record;
     });
+  }
+
+  private async lockAssignable(tx: Prisma.TransactionClient, organizationId: string, assignmentId: string) {
+    const assignments = await tx.$queryRaw<Array<TrainingAssignmentRecord>>(Prisma.sql`
+      SELECT * FROM "TrainingAssignment" WHERE "organizationId" = ${organizationId}::uuid AND "id" = ${assignmentId}::uuid FOR UPDATE
+    `);
+    const assignment = assignments[0];
+    if (!assignment) throw new Error("Access denied");
+    if (assignment.status !== "ASSIGNED") throw new TrainingEligibilityError("Only ASSIGNED training can be changed");
+    return assignment;
+  }
+
+  private async createAssignmentInTransaction(tx: Prisma.TransactionClient, input: { organizationId: string; employeeId: string; courseId: string; assignedAt: Date; dueAt: Date | null; actorUserId: string }, audit = true): Promise<TrainingAssignmentRecord> {
+    const employees = await tx.$queryRaw<Array<{ status: string }>>(Prisma.sql`
+      SELECT "status"::text AS "status" FROM "Employee" WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.employeeId}::uuid
+    `);
+    if (!employees[0]) throw new Error("Access denied");
+    if (employees[0].status === "TERMINATED") throw new TrainingEligibilityError("Training cannot be assigned to a terminated employee");
+    const courses = await tx.$queryRaw<Array<{ active: boolean }>>(Prisma.sql`
+      SELECT "active" FROM "TrainingCourse" WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.courseId}::uuid
+    `);
+    if (!courses[0]) throw new Error("Access denied");
+    if (!courses[0].active) throw new TrainingEligibilityError("Inactive training course cannot be assigned");
+    const rows = await tx.$queryRaw<TrainingAssignmentRecord[]>(Prisma.sql`
+      INSERT INTO "TrainingAssignment" ("organizationId", "employeeId", "courseId", "assignedAt", "dueAt", "createdByUserId")
+      VALUES (${input.organizationId}::uuid, ${input.employeeId}::uuid, ${input.courseId}::uuid, ${input.assignedAt}, ${input.dueAt}, ${input.actorUserId}::uuid) RETURNING *
+    `);
+    const assignment = rows[0];
+    if (!assignment) throw new TrainingValidationError("Training assignment could not be created");
+    if (audit) await tx.auditEvent.create({ data: { organizationId: input.organizationId, actorUserId: input.actorUserId, action: "TRAINING_ASSIGNED", entityType: "TrainingAssignment", entityId: assignment.id, metadata: { employeeId: assignment.employeeId, courseId: assignment.courseId, dueAt: assignment.dueAt?.toISOString() ?? null } } });
+    return assignment;
   }
 }
