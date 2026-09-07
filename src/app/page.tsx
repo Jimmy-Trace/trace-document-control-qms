@@ -7,6 +7,7 @@ import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribu
 import { OrganizationalAcknowledgmentDistribution } from "@/components/organizational-acknowledgment-distribution";
 import { MembershipAdministration } from "@/components/membership-administration";
 import { DocumentFolderManager } from "@/components/document-folder-manager";
+import { RetentionAdministration } from "@/components/retention-administration";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -36,6 +37,7 @@ export default async function HomePage() {
       <OrganizationalAcknowledgmentDistribution />
       <MembershipAdministration />
       <DocumentFolderManager />
+      <RetentionAdministration />
     </>
   );
 }
