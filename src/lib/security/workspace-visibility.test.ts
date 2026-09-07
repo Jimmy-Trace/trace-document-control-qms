@@ -9,6 +9,7 @@ describe("workspace visibility", () => {
       lifecycleOperations: false,
       acknowledgments: false,
       acknowledgmentDistribution: false,
+      controlledCopies: false,
       membershipAdministration: false,
       folderManager: true,
       retentionAdministration: false,
@@ -19,6 +20,12 @@ describe("workspace visibility", () => {
     const visibility = workspaceVisibility(["document.read", "document.acknowledge"]);
     expect(visibility.acknowledgments).toBe(true);
     expect(visibility.acknowledgmentDistribution).toBe(false);
+    expect(visibility.controlledCopies).toBe(false);
+  });
+
+  it("shows controlled-copy operations only with document distribution authority", () => {
+    expect(workspaceVisibility(["document.read"]).controlledCopies).toBe(false);
+    expect(workspaceVisibility(["document.distribute"]).controlledCopies).toBe(true);
   });
 
   it("requires both submit and review-management authority for controlled submission", () => {
