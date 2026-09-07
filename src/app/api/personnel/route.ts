@@ -12,6 +12,13 @@ const createSchema = z.object({
   userId: z.string().uuid().nullish(),
   hireDate: z.string().date().nullish(),
 });
+const transitionSchema = z.object({
+  operation: z.literal("SET_STATUS"),
+  employeeId: z.string().uuid(),
+  targetStatus: z.enum(["ACTIVE", "INACTIVE", "TERMINATED"]),
+  effectiveDate: z.string().date().nullish(),
+  reason: z.string().max(1000),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +32,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
-    const input = createSchema.parse(await request.json());
+    const body = await request.json();
+    if (body?.operation === "SET_STATUS") {
+      const input = transitionSchema.parse(body);
+      return NextResponse.json({ data: await service.transitionEmployee(context, {
+        organizationId: context.organizationId,
+        employeeId: input.employeeId,
+        targetStatus: input.targetStatus,
+        effectiveDate: input.effectiveDate ? new Date(`${input.effectiveDate}T00:00:00.000Z`) : null,
+        reason: input.reason,
+      }) });
+    }
+    const input = createSchema.parse(body);
     return NextResponse.json({ data: await service.createEmployee(context, {
       organizationId: context.organizationId,
       employeeNumber: input.employeeNumber,

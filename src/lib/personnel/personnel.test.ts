@@ -52,10 +52,12 @@ function store(): PersonnelStore {
   return {
     async listEmployees() { return [employee]; },
     async createEmployee(input) { return { ...employee, userId: input.userId, employeeNumber: input.employeeNumber, firstName: input.firstName, lastName: input.lastName, hireDate: input.hireDate }; },
+    async transitionEmployee(input) { return { ...employee, status: input.targetStatus, terminationDate: input.targetStatus === "TERMINATED" ? input.effectiveDate : null }; },
     async listJobDescriptions() { return [job]; },
     async createJobDescription(input) { return { ...job, code: input.code, title: input.title, summary: input.summary }; },
     async listAssignments() { return [assignment]; },
     async createAssignment(input) { return { ...assignment, employeeId: input.employeeId, jobDescriptionId: input.jobDescriptionId, siteId: input.siteId, departmentId: input.departmentId, isPrimary: input.isPrimary, assignedAt: input.assignedAt, createdByUserId: input.actorUserId }; },
+    async endAssignment(input) { return { ...assignment, endedAt: input.endedAt }; },
   };
 }
 
@@ -70,6 +72,8 @@ describe("personnel service", () => {
     const service = new PersonnelService(store());
     await expect(service.createEmployee(context("personnel.read"), { organizationId, employeeNumber: "EMP-2", firstName: "Test", lastName: "Person" })).rejects.toThrow("Access denied");
     await expect(service.createJobDescription(context("personnel.read"), { organizationId, code: "TECH", title: "Technician" })).rejects.toThrow("Access denied");
+    await expect(service.transitionEmployee(context("personnel.read"), { organizationId, employeeId: employee.id, targetStatus: "INACTIVE", reason: "Leave" })).rejects.toThrow("Access denied");
+    await expect(service.endAssignment(context("personnel.read"), { organizationId, assignmentId: assignment.id, endedAt: new Date("2026-09-01T00:00:00Z"), reason: "Role change" })).rejects.toThrow("Access denied");
   });
 
   it("normalizes employee identity and job description codes", async () => {
@@ -82,10 +86,13 @@ describe("personnel service", () => {
     expect(createdJob.title).toBe("Laboratory Technician");
   });
 
-  it("rejects invalid job codes and assignment dates", async () => {
+  it("rejects invalid job codes and lifecycle inputs", async () => {
     const service = new PersonnelService(store());
     await expect(service.createJobDescription(context("personnel.manage"), { organizationId, code: "bad code", title: "Technician" })).rejects.toBeInstanceOf(PersonnelValidationError);
     await expect(service.createAssignment(context("personnel.manage"), { organizationId, employeeId: employee.id, jobDescriptionId: job.id, assignedAt: new Date("invalid") })).rejects.toBeInstanceOf(PersonnelValidationError);
+    await expect(service.transitionEmployee(context("personnel.manage"), { organizationId, employeeId: employee.id, targetStatus: "TERMINATED", reason: "Employment ended" })).rejects.toBeInstanceOf(PersonnelValidationError);
+    await expect(service.endAssignment(context("personnel.manage"), { organizationId, assignmentId: assignment.id, endedAt: new Date("invalid"), reason: "Role change" })).rejects.toBeInstanceOf(PersonnelValidationError);
+    await expect(service.endAssignment(context("personnel.manage"), { organizationId, assignmentId: assignment.id, endedAt: new Date("2026-09-01T00:00:00Z"), reason: "   " })).rejects.toBeInstanceOf(PersonnelValidationError);
   });
 
   it("creates historical job assignments under personnel.manage", async () => {
@@ -93,5 +100,26 @@ describe("personnel service", () => {
     const result = await service.createAssignment(context("personnel.manage"), { organizationId, employeeId: employee.id, jobDescriptionId: job.id, isPrimary: true, assignedAt: new Date("2026-01-01T00:00:00Z") });
     expect(result.isPrimary).toBe(true);
     expect(result.employeeId).toBe(employee.id);
+  });
+
+  it("supports governed status transitions and assignment ending", async () => {
+    const service = new PersonnelService(store());
+    const terminated = await service.transitionEmployee(context("personnel.manage"), {
+      organizationId,
+      employeeId: employee.id,
+      targetStatus: "TERMINATED",
+      effectiveDate: new Date("2026-09-01T00:00:00Z"),
+      reason: "Employment ended",
+    });
+    expect(terminated.status).toBe("TERMINATED");
+    expect(terminated.terminationDate?.toISOString()).toBe("2026-09-01T00:00:00.000Z");
+
+    const ended = await service.endAssignment(context("personnel.manage"), {
+      organizationId,
+      assignmentId: assignment.id,
+      endedAt: new Date("2026-09-01T00:00:00Z"),
+      reason: "Role changed",
+    });
+    expect(ended.endedAt?.toISOString()).toBe("2026-09-01T00:00:00.000Z");
   });
 });
