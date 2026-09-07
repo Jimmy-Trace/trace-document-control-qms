@@ -58,6 +58,7 @@ export interface DocumentQueryStore {
     organizationId: string;
     query?: string;
     status?: ListedStatus;
+    folderId?: string;
     limit: number;
     cursor?: { createdAt: Date; id: string };
   }): Promise<ListedDocumentVersion[]>;
@@ -82,6 +83,7 @@ export class DocumentQueryService {
       organizationId: string;
       query?: string;
       status?: ListedStatus;
+      folderId?: string;
       limit?: number;
       cursor?: string;
     },
@@ -96,6 +98,7 @@ export class DocumentQueryService {
       organizationId: input.organizationId,
       query: input.query?.trim() || undefined,
       status: input.status,
+      folderId: input.folderId,
       limit: limit + 1,
       cursor,
     });
