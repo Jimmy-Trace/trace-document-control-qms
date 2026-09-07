@@ -1,11 +1,21 @@
 import { requireAuthorization, type AuthorizationContext } from "../security/authorization";
 
 export type HoldEntityType = "Document" | "DocumentVersion" | "FileObject";
+export type DispositionState = "HELD" | "RETAINED" | "ELIGIBLE";
+export interface DispositionStatus {
+  entityType: HoldEntityType;
+  entityId: string;
+  state: DispositionState;
+  activeHoldIds: string[];
+  retentionPolicyIds: string[];
+  retentionEligibleAt: Date | null;
+}
 export interface RetentionStore {
   list(organizationId: string): Promise<{
     policies: Array<{ id: string; recordType: string; jurisdiction: string | null; retentionDays: number; active: boolean }>;
     holds: Array<{ id: string; entityType: string; entityId: string; reason: string; status: string; createdAt: Date; releasedAt: Date | null; releaseReason: string | null }>;
   }>;
+  dispositionStatus(input: { organizationId: string; entityType: HoldEntityType; entityId: string; now: Date }): Promise<DispositionStatus>;
   createPolicy(input: { organizationId: string; recordType: string; jurisdiction: string | null; retentionDays: number; actorUserId: string; occurredAt: Date }): Promise<{ id: string }>;
   setPolicyActive(input: { organizationId: string; policyId: string; active: boolean; actorUserId: string; occurredAt: Date }): Promise<void>;
   createHold(input: { organizationId: string; entityType: HoldEntityType; entityId: string; reason: string; actorUserId: string; occurredAt: Date }): Promise<{ id: string }>;
@@ -18,6 +28,11 @@ export class RetentionService {
   async list(context: AuthorizationContext, organizationId: string) {
     requireAuthorization(context, { organizationId, permission: "administration.manage" });
     return this.store.list(organizationId);
+  }
+
+  async dispositionStatus(context: AuthorizationContext, input: { organizationId: string; entityType: HoldEntityType; entityId: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "administration.manage" });
+    return this.store.dispositionStatus({ ...input, now: this.clock() });
   }
 
   async createPolicy(context: AuthorizationContext, input: { organizationId: string; recordType: string; jurisdiction?: string | null; retentionDays: number }) {

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
-import type { RetentionStore, HoldEntityType } from "./service";
+import type { RetentionStore, HoldEntityType, DispositionStatus } from "./service";
 import { DispositionBlockedError, RetentionValidationError } from "./service";
 
 export class PrismaRetentionStore implements RetentionStore {
@@ -10,6 +10,23 @@ export class PrismaRetentionStore implements RetentionStore {
       db.legalHold.findMany({ where: { organizationId }, orderBy: { createdAt: "desc" }, take: 100 }),
     ]);
     return { policies, holds };
+  }
+
+  async dispositionStatus(input: { organizationId: string; entityType: HoldEntityType; entityId: string; now: Date }): Promise<DispositionStatus> {
+    const record = input.entityType === "Document"
+      ? await db.document.findFirst({ where: { organizationId: input.organizationId, id: input.entityId }, select: { id: true, createdAt: true } })
+      : input.entityType === "DocumentVersion"
+        ? await db.documentVersion.findFirst({ where: { organizationId: input.organizationId, id: input.entityId }, select: { id: true, createdAt: true } })
+        : await db.fileObject.findFirst({ where: { organizationId: input.organizationId, id: input.entityId }, select: { id: true, createdAt: true } });
+    if (!record) throw new Error("Access denied");
+
+    const [holds, policies] = await Promise.all([
+      db.legalHold.findMany({ where: { organizationId: input.organizationId, entityType: input.entityType, entityId: input.entityId, status: "ACTIVE" }, select: { id: true } }),
+      db.retentionPolicy.findMany({ where: { organizationId: input.organizationId, recordType: input.entityType, active: true }, orderBy: { retentionDays: "desc" }, select: { id: true, retentionDays: true } }),
+    ]);
+    const retentionEligibleAt = policies.length ? new Date(record.createdAt.getTime() + policies[0]!.retentionDays * 86400000) : null;
+    const state = holds.length ? "HELD" : retentionEligibleAt && input.now < retentionEligibleAt ? "RETAINED" : "ELIGIBLE";
+    return { entityType: input.entityType, entityId: input.entityId, state, activeHoldIds: holds.map((row) => row.id), retentionPolicyIds: policies.map((row) => row.id), retentionEligibleAt };
   }
 
   async createPolicy(input: { organizationId: string; recordType: string; jurisdiction: string | null; retentionDays: number; actorUserId: string; occurredAt: Date }) {
