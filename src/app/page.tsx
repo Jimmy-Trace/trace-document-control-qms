@@ -4,6 +4,7 @@ import { ApprovalOperations } from "@/components/approval-operations";
 import { ControlledSubmission } from "@/components/controlled-submission";
 import { MyAcknowledgments } from "@/components/my-acknowledgments";
 import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribution";
+import { OrganizationalAcknowledgmentDistribution } from "@/components/organizational-acknowledgment-distribution";
 import { MembershipAdministration } from "@/components/membership-administration";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -31,6 +32,7 @@ export default async function HomePage() {
       <LifecycleOperations />
       <MyAcknowledgments />
       <AcknowledgmentDistribution />
+      <OrganizationalAcknowledgmentDistribution />
       <MembershipAdministration />
     </>
   );
