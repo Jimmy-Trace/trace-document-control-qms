@@ -12,6 +12,7 @@ const activeContext: AuthorizationContext = {
   userState: "ACTIVE",
   grants: [
     { permission: "document.create", scopeType: "ORGANIZATION", scopeId: null },
+    { permission: "document.revise", scopeType: "ORGANIZATION", scopeId: null },
     { permission: "document.submit", scopeType: "ORGANIZATION", scopeId: null },
     {
       permission: "document.approve",
@@ -176,6 +177,24 @@ describe("document command boundary", () => {
       actorUserId: "user-1",
       sourceVersionId: "version-1",
     });
+  });
+
+  it("does not allow document.create alone to revise", async () => {
+    const service = new DocumentCommandService(store(draft).implementation);
+    const createOnly = {
+      ...activeContext,
+      grants: activeContext.grants.filter((grant) => grant.permission !== "document.revise"),
+    };
+    await expect(
+      service.createRevision(createOnly, {
+        organizationId: "org-1",
+        sourceVersionId: "version-1",
+        revisionLabel: "2.0",
+        contentHash: "c".repeat(64),
+        contentText: "Successor controlled content",
+        changeSummary: "Annual revision",
+      }),
+    ).rejects.toThrow("Access denied");
   });
 
   it("passes review and final approver evidence on submission", async () => {
