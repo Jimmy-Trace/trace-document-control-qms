@@ -18,6 +18,8 @@ describe("workspace visibility", () => {
       recordArchive: false,
       recordExport: false,
       recordTypeAdministration: false,
+      personnelManagement: false,
+      personnelManage: false,
     });
   });
 
@@ -67,5 +69,19 @@ describe("workspace visibility", () => {
     expect(exporter.recordCreate).toBe(false);
     expect(exporter.recordArchive).toBe(false);
     expect(exporter.recordExport).toBe(true);
+  });
+
+  it("keeps personnel browsing and management independently least-privileged", () => {
+    const reader = workspaceVisibility(["personnel.read"]);
+    expect(reader.personnelManagement).toBe(true);
+    expect(reader.personnelManage).toBe(false);
+
+    const manager = workspaceVisibility(["personnel.read", "personnel.manage"]);
+    expect(manager.personnelManagement).toBe(true);
+    expect(manager.personnelManage).toBe(true);
+
+    const manageOnly = workspaceVisibility(["personnel.manage"]);
+    expect(manageOnly.personnelManagement).toBe(false);
+    expect(manageOnly.personnelManage).toBe(true);
   });
 });
