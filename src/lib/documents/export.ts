@@ -18,7 +18,7 @@ export async function exportControlledDocument(
   context: AuthorizationContext,
   input: { organizationId: string; versionId: string; reason: string },
 ): Promise<ControlledExport> {
-  requireAuthorization(context, { organizationId: input.organizationId, permission: "document.read" });
+  requireAuthorization(context, { organizationId: input.organizationId, permission: "document.export" });
   const reason = input.reason.trim();
   if (!reason || reason.length > 500) throw new ControlledExportValidationError("Export reason is required and must be 500 characters or fewer");
 
