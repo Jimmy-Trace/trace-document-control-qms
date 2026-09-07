@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "../db";
 import { hashOpaqueToken } from "./crypto";
 import { nextIdleExpiration, validateSession } from "./session";
-import type { AuthorizationContext } from "./authorization";
+import type { AuthorizationContext, ScopeType } from "./authorization";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -36,6 +37,13 @@ export async function authenticateRequest(request: NextRequest): Promise<Authori
     throw new AuthenticationRequiredError();
   }
 
+  const scopedAssignments = await db.$queryRaw<Array<{ roleId: string; scopeType: ScopeType; scopeId: string | null }>>(Prisma.sql`
+    SELECT "roleId", "scopeType", "scopeId"
+    FROM "UserRole"
+    WHERE "organizationId"=${record.organizationId}::uuid AND "userId"=${record.userId}::uuid
+  `);
+  const scopeByRole = new Map(scopedAssignments.map((row) => [row.roleId, row]));
+
   await db.session.updateMany({
     where: { id: record.id, organizationId: record.organizationId, revokedAt: null },
     data: {
@@ -48,13 +56,14 @@ export async function authenticateRequest(request: NextRequest): Promise<Authori
     userId: record.userId,
     organizationId: record.organizationId,
     userState: "ACTIVE",
-    grants: record.user.roles.flatMap(({ role }) =>
-      role.permissions.map(({ permission }) => ({
+    grants: record.user.roles.flatMap(({ roleId, role }) => {
+      const scope = scopeByRole.get(roleId) ?? { scopeType: "ORGANIZATION" as const, scopeId: null };
+      return role.permissions.map(({ permission }) => ({
         permission: permission.key,
-        scopeType: "ORGANIZATION" as const,
-        scopeId: null,
-      })),
-    ),
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      }));
+    }),
   };
 }
 
