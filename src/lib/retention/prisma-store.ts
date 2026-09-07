@@ -13,7 +13,14 @@ export class PrismaRetentionStore implements RetentionStore {
   }
 
   async dispositionStatus(input: { organizationId: string; entityType: HoldEntityType; entityId: string; now: Date }): Promise<DispositionStatus> {
-    if (input.entityType === "QualityRecord") return qualityRecordDispositionStatus(db, input);
+    if (input.entityType === "QualityRecord") {
+      return qualityRecordDispositionStatus(db, {
+        organizationId: input.organizationId,
+        entityType: "QualityRecord",
+        entityId: input.entityId,
+        now: input.now,
+      });
+    }
     const record = input.entityType === "Document"
       ? await db.document.findFirst({ where: { organizationId: input.organizationId, id: input.entityId }, select: { id: true, createdAt: true } })
       : input.entityType === "DocumentVersion"
