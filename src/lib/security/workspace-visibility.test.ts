@@ -13,6 +13,9 @@ describe("workspace visibility", () => {
       membershipAdministration: false,
       folderManager: true,
       retentionAdministration: false,
+      recordManagement: false,
+      recordCreate: false,
+      recordTypeAdministration: false,
     });
   });
 
@@ -37,5 +40,20 @@ describe("workspace visibility", () => {
     const visibility = workspaceVisibility(["administration.manage"]);
     expect(visibility.membershipAdministration).toBe(true);
     expect(visibility.retentionAdministration).toBe(true);
+    expect(visibility.recordTypeAdministration).toBe(true);
+  });
+
+  it("keeps record browsing and record creation independently least-privileged", () => {
+    const reader = workspaceVisibility(["record.read"]);
+    expect(reader.recordManagement).toBe(true);
+    expect(reader.recordCreate).toBe(false);
+
+    const creatorWithoutRead = workspaceVisibility(["record.create"]);
+    expect(creatorWithoutRead.recordManagement).toBe(false);
+    expect(creatorWithoutRead.recordCreate).toBe(true);
+
+    const creator = workspaceVisibility(["record.read", "record.create"]);
+    expect(creator.recordManagement).toBe(true);
+    expect(creator.recordCreate).toBe(true);
   });
 });
