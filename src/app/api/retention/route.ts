@@ -5,20 +5,27 @@ import { PrismaRetentionStore } from "@/lib/retention/prisma-store";
 import { RetentionService, RetentionValidationError } from "@/lib/retention/service";
 
 const uuid = z.string().uuid();
+const entityType = z.enum(["Document", "DocumentVersion", "FileObject"]);
 const command = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("CREATE_POLICY"), recordType: z.string().max(80), jurisdiction: z.string().max(120).nullable().optional(), retentionDays: z.number().int() }),
   z.object({ operation: z.literal("SET_POLICY_ACTIVE"), policyId: uuid, active: z.boolean() }),
-  z.object({ operation: z.literal("CREATE_HOLD"), entityType: z.enum(["Document", "DocumentVersion", "FileObject"]), entityId: uuid, reason: z.string().max(500) }),
+  z.object({ operation: z.literal("CREATE_HOLD"), entityType, entityId: uuid, reason: z.string().max(500) }),
   z.object({ operation: z.literal("RELEASE_HOLD"), holdId: uuid, reason: z.string().max(500) }),
 ]);
 const service = new RetentionService(new PrismaRetentionStore());
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await authenticateRequest(request);
+    const context = await authenticateRequest(request), params = request.nextUrl.searchParams;
+    const requestedType = params.get("entityType"), requestedId = params.get("entityId");
+    if (requestedType || requestedId) {
+      const parsed = z.object({ entityType, entityId: uuid }).parse({ entityType: requestedType, entityId: requestedId });
+      return NextResponse.json({ data: await service.dispositionStatus(context, { organizationId: context.organizationId, ...parsed }) });
+    }
     return NextResponse.json({ data: await service.list(context, context.organizationId) });
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid retention query" }, { status: 422 });
     if (error instanceof Error && error.message === "Access denied") return NextResponse.json({ error: "Access denied" }, { status: 403 });
     return NextResponse.json({ error: "Unable to load retention controls" }, { status: 500 });
   }
