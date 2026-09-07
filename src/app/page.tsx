@@ -6,6 +6,7 @@ import { ControlledSubmission } from "@/components/controlled-submission";
 import { MyAcknowledgments } from "@/components/my-acknowledgments";
 import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribution";
 import { OrganizationalAcknowledgmentDistribution } from "@/components/organizational-acknowledgment-distribution";
+import { ControlledCopyAdministration } from "@/components/controlled-copy-administration";
 import { MembershipAdministration } from "@/components/membership-administration";
 import { DocumentFolderManager } from "@/components/document-folder-manager";
 import { RetentionAdministration } from "@/components/retention-administration";
@@ -57,6 +58,7 @@ export default async function HomePage() {
       {visibility.acknowledgments && <MyAcknowledgments />}
       {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
       {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
+      {visibility.controlledCopies && <ControlledCopyAdministration />}
       {visibility.membershipAdministration && <MembershipAdministration />}
       {visibility.folderManager && <DocumentFolderManager />}
       {visibility.retentionAdministration && <RetentionAdministration />}
