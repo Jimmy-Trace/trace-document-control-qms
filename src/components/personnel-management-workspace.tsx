@@ -25,7 +25,29 @@ export function PersonnelManagementWorkspace({ canManage }: { canManage: boolean
     if (assignmentResponse.ok) setAssignments((await assignmentResponse.json()).data ?? []);
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      fetch("/api/personnel", { credentials: "same-origin" }),
+      fetch("/api/personnel/jobs", { credentials: "same-origin" }),
+      fetch("/api/personnel/assignments", { credentials: "same-origin" }),
+    ]).then(async ([employeeResponse, jobResponse, assignmentResponse]) => {
+      if (cancelled) return;
+      if (employeeResponse.ok) {
+        const body = await employeeResponse.json();
+        if (!cancelled) setEmployees(body.data ?? []);
+      }
+      if (jobResponse.ok) {
+        const body = await jobResponse.json();
+        if (!cancelled) setJobs(body.data ?? []);
+      }
+      if (assignmentResponse.ok) {
+        const body = await assignmentResponse.json();
+        if (!cancelled) setAssignments(body.data ?? []);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
   const visibleEmployees = useMemo(() => {
