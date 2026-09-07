@@ -1,4 +1,5 @@
 import { DocumentControlDashboard } from "@/components/document-control-dashboard";
+import { DashboardVisibilityGate } from "@/components/dashboard-visibility-gate";
 import { LifecycleOperations } from "@/components/lifecycle-operations";
 import { ApprovalOperations } from "@/components/approval-operations";
 import { ControlledSubmission } from "@/components/controlled-submission";
@@ -46,6 +47,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <DashboardVisibilityGate />
       <DocumentControlDashboard
         developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
       />
