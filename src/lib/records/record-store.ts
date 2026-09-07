@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
+import { assertQualityRecordDispositionAllowed } from "../retention/prisma-store";
 import type { QualityRecord, RecordStore, RecordTypeRecord } from "./records";
 import { RecordEligibilityError } from "./records";
 
@@ -94,6 +95,49 @@ export class PrismaRecordStore implements RecordStore {
           title: row.title,
           occurredAt: row.occurredAt?.toISOString() ?? null,
           fileId: row.fileId,
+        },
+      }});
+      return row;
+    });
+  }
+
+  async archiveRecord(input: { organizationId: string; recordId: string; reason: string; actorUserId: string; occurredAt: Date }): Promise<QualityRecord | null> {
+    return db.$transaction(async (tx) => {
+      const current = await tx.$queryRaw<QualityRecord[]>(Prisma.sql`
+        SELECT * FROM "QualityRecord"
+        WHERE "organizationId" = ${input.organizationId}::uuid AND "id" = ${input.recordId}::uuid
+        FOR UPDATE
+      `);
+      const prior = current[0];
+      if (!prior || prior.status !== "ACTIVE") return null;
+      const disposition = await assertQualityRecordDispositionAllowed(tx, { organizationId: input.organizationId, recordId: input.recordId, now: input.occurredAt });
+      const updated = await tx.$queryRaw<QualityRecord[]>(Prisma.sql`
+        UPDATE "QualityRecord"
+        SET "status" = 'ARCHIVED'::"QualityRecordStatus"
+        WHERE "organizationId" = ${input.organizationId}::uuid
+          AND "id" = ${input.recordId}::uuid
+          AND "status" = 'ACTIVE'::"QualityRecordStatus"
+        RETURNING *
+      `);
+      const row = updated[0];
+      if (!row) return null;
+      await tx.auditEvent.create({ data: {
+        organizationId: input.organizationId,
+        actorUserId: input.actorUserId,
+        action: "QUALITY_RECORD_ARCHIVED",
+        entityType: "QualityRecord",
+        entityId: row.id,
+        entityVersion: row.recordNumber,
+        occurredAt: input.occurredAt,
+        reason: input.reason,
+        metadata: {
+          fromStatus: prior.status,
+          toStatus: row.status,
+          recordTypeId: row.recordTypeId,
+          recordNumber: row.recordNumber,
+          retentionPolicyIds: disposition.retentionPolicyIds,
+          retentionEligibleAt: disposition.retentionEligibleAt?.toISOString() ?? null,
+          activeHoldIds: disposition.activeHoldIds,
         },
       }});
       return row;
