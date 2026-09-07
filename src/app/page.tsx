@@ -6,6 +6,7 @@ import { MyAcknowledgments } from "@/components/my-acknowledgments";
 import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribution";
 import { OrganizationalAcknowledgmentDistribution } from "@/components/organizational-acknowledgment-distribution";
 import { MembershipAdministration } from "@/components/membership-administration";
+import { DocumentFolderManager } from "@/components/document-folder-manager";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -34,6 +35,7 @@ export default async function HomePage() {
       <AcknowledgmentDistribution />
       <OrganizationalAcknowledgmentDistribution />
       <MembershipAdministration />
+      <DocumentFolderManager />
     </>
   );
 }
