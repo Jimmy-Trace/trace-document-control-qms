@@ -17,6 +17,8 @@ function store(): FolderStore {
     async list() { return { folders: [], documents: [] }; },
     async createFolder() { return { id: "33333333-3333-4333-8333-333333333333" }; },
     async renameFolder() {},
+    async moveFolder() {},
+    async deleteFolder() {},
     async placeDocument() {},
   };
 }
@@ -30,10 +32,19 @@ describe("FolderHierarchyService", () => {
     expect(captured).toMatchObject({ organizationId: context.organizationId, actorUserId: context.userId, name: "Policies" });
   });
 
+  it("binds folder moves to the authenticated actor", async () => {
+    let captured: unknown;
+    const custom: FolderStore = { ...store(), async moveFolder(input) { captured = input; } };
+    const service = new FolderHierarchyService(custom, () => new Date("2026-09-07T01:00:00Z"));
+    await service.move(context, { organizationId: context.organizationId, folderId: "33333333-3333-4333-8333-333333333333", parentFolderId: null });
+    expect(captured).toMatchObject({ organizationId: context.organizationId, actorUserId: context.userId, parentFolderId: null });
+  });
+
   it("requires document.create for mutations", async () => {
     const service = new FolderHierarchyService(store());
     const noCreate: AuthorizationContext = { ...context, grants: [{ permission: "document.read", scopeType: "ORGANIZATION", scopeId: null }] };
     await expect(service.create(noCreate, { organizationId: context.organizationId, parentFolderId: null, name: "Policies" })).rejects.toThrow("Access denied");
+    await expect(service.delete(noCreate, { organizationId: context.organizationId, folderId: "33333333-3333-4333-8333-333333333333" })).rejects.toThrow("Access denied");
   });
 
   it("rejects blank folder names", async () => {
