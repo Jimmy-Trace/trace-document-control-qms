@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; status: "ACTIVE" | "INACTIVE" | "TERMINATED" };
 type Credential = { id: string; employeeId: string; credentialType: string; credentialNumber: string | null; issuingAuthority: string | null; issuedAt: string | null; expiresAt: string | null; fileId: string | null; createdAt: string };
 
-export function PersonnelCredentialWorkspace({ canManage }: { canManage: boolean }) {
+export function PersonnelCredentialWorkspace({ canManage, today }: { canManage: boolean; today: string }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [notice, setNotice] = useState("");
@@ -40,6 +40,7 @@ export function PersonnelCredentialWorkspace({ canManage }: { canManage: boolean
   }, []);
 
   const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
+  const todayStart = useMemo(() => new Date(`${today}T00:00:00.000Z`).getTime(), [today]);
 
   async function createCredential(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,7 +82,7 @@ export function PersonnelCredentialWorkspace({ canManage }: { canManage: boolean
     <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Credential</th><th>Number</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th>Evidence</th></tr></thead><tbody>
       {credentials.map((credential) => {
         const employee = employeeById.get(credential.employeeId);
-        const expired = credential.expiresAt ? new Date(credential.expiresAt).getTime() < Date.now() : false;
+        const expired = credential.expiresAt ? new Date(credential.expiresAt).getTime() < todayStart : false;
         return <tr key={credential.id}><td>{employee ? `${employee.employeeNumber} · ${employee.lastName}, ${employee.firstName}` : credential.employeeId}</td><td>{credential.credentialType}</td><td>{credential.credentialNumber ?? "—"}</td><td>{credential.issuingAuthority ?? "—"}</td><td>{credential.issuedAt ? new Date(credential.issuedAt).toLocaleDateString() : "—"}</td><td>{credential.expiresAt ? new Date(credential.expiresAt).toLocaleDateString() : "—"}</td><td>{expired ? "EXPIRED" : "CURRENT"}</td><td>{credential.fileId ? "Attached" : "—"}</td></tr>;
       })}
       {!credentials.length && <tr><td colSpan={8}>No governed personnel credentials have been recorded.</td></tr>}
