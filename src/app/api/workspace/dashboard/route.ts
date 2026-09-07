@@ -4,6 +4,7 @@ import {
   AuthenticationRequiredError,
 } from "@/lib/security/authenticated-request";
 import { evaluateAuthorization } from "@/lib/security/authorization";
+import { dashboardVisibility } from "@/lib/security/dashboard-visibility";
 import { PrismaDeliveryStore } from "@/lib/notifications/prisma-store";
 import { NotificationInboxService } from "@/lib/notifications/service";
 import { PrismaReviewStore } from "@/lib/reviews/prisma-store";
@@ -54,6 +55,18 @@ export async function GET(request: NextRequest) {
       organizationId,
       permission: "document.make_effective",
     }).allowed;
+    const capabilities = {
+      canManageReviews,
+      canManageNotifications,
+      canManageAccess,
+      canReadDocuments,
+      canCreateDocuments,
+      canSubmitDocuments,
+      canReviewDocuments,
+      canApproveDocuments,
+      canMakeDocumentsEffective,
+    };
+    const visibility = dashboardVisibility(capabilities);
     const deliveryStore = new PrismaDeliveryStore();
     const notifications = await new NotificationInboxService(
       deliveryStore,
@@ -77,17 +90,8 @@ export async function GET(request: NextRequest) {
         organizationId,
         userId: context.userId,
         user,
-        capabilities: {
-          canManageReviews,
-          canManageNotifications,
-          canManageAccess,
-          canReadDocuments,
-          canCreateDocuments,
-          canSubmitDocuments,
-          canReviewDocuments,
-          canApproveDocuments,
-          canMakeDocumentsEffective,
-        },
+        capabilities,
+        visibility,
         notifications,
         reviews,
         failures,
