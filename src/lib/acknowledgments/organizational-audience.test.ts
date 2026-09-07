@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { AuthorizationContext } from "../security/authorization";
 import { OrganizationalAudienceDistributionService, OrganizationalAudienceValidationError, type OrganizationalAudienceStore } from "./organizational-audience";
 
-const context = { organizationId: "11111111-1111-4111-8111-111111111111", userId: "22222222-2222-4222-8222-222222222222", permissions: new Set(["document.distribute"]) };
+const context: AuthorizationContext = {
+  organizationId: "11111111-1111-4111-8111-111111111111",
+  userId: "22222222-2222-4222-8222-222222222222",
+  userState: "ACTIVE",
+  grants: [{ permission: "document.distribute", scopeType: "ORGANIZATION", scopeId: null }],
+};
 
 function store(): OrganizationalAudienceStore {
   return {
@@ -29,6 +35,6 @@ describe("OrganizationalAudienceDistributionService", () => {
 
   it("requires document distribution authorization", async () => {
     const service = new OrganizationalAudienceDistributionService(store());
-    await expect(service.listOptions({ ...context, permissions: new Set() }, context.organizationId)).rejects.toThrow("Access denied");
+    await expect(service.listOptions({ ...context, grants: [] }, context.organizationId)).rejects.toThrow("Access denied");
   });
 });
