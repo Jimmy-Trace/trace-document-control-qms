@@ -20,6 +20,8 @@ describe("workspace visibility", () => {
       recordTypeAdministration: false,
       personnelManagement: false,
       personnelManage: false,
+      trainingManagement: false,
+      trainingManage: false,
     });
   });
 
