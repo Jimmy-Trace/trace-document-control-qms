@@ -4,6 +4,7 @@ export type WorkspaceVisibility = {
   lifecycleOperations: boolean;
   acknowledgments: boolean;
   acknowledgmentDistribution: boolean;
+  controlledCopies: boolean;
   membershipAdministration: boolean;
   folderManager: boolean;
   retentionAdministration: boolean;
@@ -19,6 +20,7 @@ export function workspaceVisibility(permissionKeys: Iterable<string>): Workspace
       has("document.make_effective") || has("document.retire") || has("document.revise"),
     acknowledgments: has("document.acknowledge"),
     acknowledgmentDistribution: has("document.distribute"),
+    controlledCopies: has("document.distribute"),
     membershipAdministration: has("administration.manage"),
     folderManager: has("document.read"),
     retentionAdministration: has("administration.manage"),
