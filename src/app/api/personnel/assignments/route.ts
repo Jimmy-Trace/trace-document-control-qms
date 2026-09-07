@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest, AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { PrismaPersonnelStore } from "@/lib/personnel/personnel-store";
+import { PersonnelEligibilityError, PersonnelService, PersonnelValidationError } from "@/lib/personnel/personnel";
+
+const service = new PersonnelService(new PrismaPersonnelStore());
+const createSchema = z.object({
+  employeeId: z.string().uuid(),
+  jobDescriptionId: z.string().uuid(),
+  siteId: z.string().uuid().nullish(),
+  departmentId: z.string().uuid().nullish(),
+  isPrimary: z.boolean().optional(),
+  assignedAt: z.string().date(),
+});
+
+export async function GET(request: NextRequest) {
+  try {
+    const context = await authenticateRequest(request);
+    const employeeId = request.nextUrl.searchParams.get("employeeId") ?? undefined;
+    if (employeeId) z.string().uuid().parse(employeeId);
+    return NextResponse.json({ data: await service.listAssignments(context, context.organizationId, employeeId) });
+  } catch (error) {
+    return respond(error);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const context = await authenticateRequest(request);
+    const input = createSchema.parse(await request.json());
+    return NextResponse.json({ data: await service.createAssignment(context, {
+      organizationId: context.organizationId,
+      employeeId: input.employeeId,
+      jobDescriptionId: input.jobDescriptionId,
+      siteId: input.siteId ?? null,
+      departmentId: input.departmentId ?? null,
+      isPrimary: input.isPrimary ?? false,
+      assignedAt: new Date(`${input.assignedAt}T00:00:00.000Z`),
+    }) }, { status: 201 });
+  } catch (error) {
+    return respond(error);
+  }
+}
+
+function respond(error: unknown) {
+  if (error instanceof AuthenticationRequiredError) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid personnel assignment request" }, { status: 422 });
+  if (error instanceof PersonnelValidationError || error instanceof PersonnelEligibilityError) return NextResponse.json({ error: error.message }, { status: 409 });
+  if (error instanceof Error && error.message === "Access denied") return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  return NextResponse.json({ error: "Personnel assignment operation failed" }, { status: 500 });
+}
