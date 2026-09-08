@@ -12,6 +12,7 @@ export interface EquipmentStore{
   create(input:{organizationId:string;equipmentNumber:string;name:string;manufacturer:string|null;model:string|null;serialNumber:string|null;siteId:string|null;departmentId:string|null;receivedAt:Date|null;calibrationRequired:boolean;calibrationIntervalDays:number|null;nextCalibrationDueAt:Date|null;maintenanceRequired:boolean;maintenanceIntervalDays:number|null;nextMaintenanceDueAt:Date|null;actorUserId:string}):Promise<EquipmentRecord>;
   listEvents(organizationId:string,equipmentId:string):Promise<EquipmentEventRecord[]>;
   addEvent(input:{organizationId:string;equipmentId:string;eventType:EquipmentEventType;occurredAt:Date;summary:string;evidenceFileId:string|null;performedByUserId:string|null;actorUserId:string}):Promise<EquipmentEventRecord>;
+  transition(input:{organizationId:string;equipmentId:string;status:EquipmentStatus;reason:string;actorUserId:string}):Promise<EquipmentRecord>;
 }
 
 export class EquipmentService{
@@ -33,5 +34,11 @@ export class EquipmentService{
     const summary=input.summary.trim(); if(!summary||summary.length>5000)throw new EquipmentValidationError("Equipment event summary is required and must not exceed 5000 characters");
     if(Number.isNaN(input.occurredAt.getTime()))throw new EquipmentValidationError("Equipment event time is invalid");
     return this.store.addEvent({...input,summary,evidenceFileId:input.evidenceFileId??null,performedByUserId:input.performedByUserId??null,actorUserId:context.userId});
+  }
+  transition(context:AuthorizationContext,input:{organizationId:string;equipmentId:string;status:EquipmentStatus;reason:string}){
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"equipment.manage"});
+    const reason=input.reason.trim();
+    if(!reason||reason.length>1000)throw new EquipmentValidationError("Equipment lifecycle reason is required and must not exceed 1000 characters");
+    return this.store.transition({...input,reason,actorUserId:context.userId});
   }
 }
