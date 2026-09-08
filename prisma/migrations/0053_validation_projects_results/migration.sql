@@ -1,3 +1,5 @@
+ALTER TABLE "LaboratoryMethodVersion" ADD CONSTRAINT "LaboratoryMethodVersion_org_id_key" UNIQUE ("organizationId","id");
+
 CREATE TYPE "ValidationProjectStatus" AS ENUM ('DRAFT','IN_PROGRESS','COMPLETED','CANCELLED');
 CREATE TYPE "ValidationResultOutcome" AS ENUM ('PASS','FAIL');
 
