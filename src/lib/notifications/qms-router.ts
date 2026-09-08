@@ -57,7 +57,7 @@ export class QmsNotificationRouter {
           const inserted=await tx.$executeRaw(Prisma.sql`
             INSERT INTO "NotificationOutbox" ("organizationId","eventKey","recipientUserId",channel,"templateKey",payload,"topicKey")
             VALUES (${input.organizationId}::uuid,${eventKey},${recipient.userId}::uuid,${channel}::"NotificationChannel",${rule.templateKey},${JSON.stringify(input.payload)}::jsonb,${input.topicKey})
-            ON CONFLICT ("organizationId","eventKey","recipientUserId",channel) NULLS NOT DISTINCT DO NOTHING`);
+            ON CONFLICT ("organizationId","eventKey","recipientUserId",channel) DO NOTHING`);
           queued+=inserted;
         }
       }
