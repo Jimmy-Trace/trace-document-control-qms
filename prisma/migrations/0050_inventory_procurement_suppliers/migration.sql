@@ -100,6 +100,35 @@ CREATE OR REPLACE FUNCTION reject_procurement_evidence_mutation() RETURNS trigge
 CREATE TRIGGER "PurchaseOrderReceipt_append_only" BEFORE UPDATE OR DELETE ON "PurchaseOrderReceipt" FOR EACH ROW EXECUTE FUNCTION reject_procurement_evidence_mutation();
 CREATE TRIGGER "PurchaseOrderActionEvent_append_only" BEFORE UPDATE OR DELETE ON "PurchaseOrderActionEvent" FOR EACH ROW EXECUTE FUNCTION reject_procurement_evidence_mutation();
 
+CREATE OR REPLACE FUNCTION guard_purchase_order_status_transition() RETURNS trigger AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status AND NOT (
+    (OLD.status='DRAFT' AND NEW.status IN ('SUBMITTED','CANCELLED')) OR
+    (OLD.status='SUBMITTED' AND NEW.status IN ('APPROVED','CANCELLED')) OR
+    (OLD.status='APPROVED' AND NEW.status IN ('ORDERED','CANCELLED')) OR
+    (OLD.status='ORDERED' AND NEW.status IN ('PARTIALLY_RECEIVED','RECEIVED','CANCELLED')) OR
+    (OLD.status='PARTIALLY_RECEIVED' AND NEW.status='RECEIVED')
+  ) THEN RAISE EXCEPTION 'Invalid purchase order status transition from % to %',OLD.status,NEW.status; END IF;
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER "PurchaseOrder_status_guard" BEFORE UPDATE OF status ON "PurchaseOrder" FOR EACH ROW EXECUTE FUNCTION guard_purchase_order_status_transition();
+
+CREATE OR REPLACE FUNCTION guard_purchase_order_receipt() RETURNS trigger AS $$
+DECLARE ordered numeric(18,4); prior numeric(18,4); line_uom text; line_material uuid; order_status "PurchaseOrderStatus"; lot_material uuid;
+BEGIN
+  SELECT l."quantityOrdered",l."unitOfMeasure",l."materialId",o.status INTO ordered,line_uom,line_material,order_status
+  FROM "PurchaseOrderLine" l JOIN "PurchaseOrder" o ON o."organizationId"=l."organizationId" AND o.id=l."purchaseOrderId"
+  WHERE l."organizationId"=NEW."organizationId" AND l.id=NEW."purchaseOrderLineId" FOR UPDATE OF l;
+  IF ordered IS NULL OR order_status NOT IN ('ORDERED','PARTIALLY_RECEIVED') THEN RAISE EXCEPTION 'Purchase order line is not receivable'; END IF;
+  SELECT "materialId" INTO lot_material FROM "MaterialLot" WHERE "organizationId"=NEW."organizationId" AND id=NEW."materialLotId";
+  IF lot_material IS NULL OR lot_material<>line_material THEN RAISE EXCEPTION 'Received lot must belong to ordered material'; END IF;
+  IF NEW."unitOfMeasure"<>line_uom THEN RAISE EXCEPTION 'Receipt unit must match purchase order line unit'; END IF;
+  SELECT COALESCE(sum("quantityReceived"),0) INTO prior FROM "PurchaseOrderReceipt" WHERE "organizationId"=NEW."organizationId" AND "purchaseOrderLineId"=NEW."purchaseOrderLineId";
+  IF prior+NEW."quantityReceived">ordered THEN RAISE EXCEPTION 'Receipt exceeds ordered quantity'; END IF;
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER "PurchaseOrderReceipt_guard" BEFORE INSERT ON "PurchaseOrderReceipt" FOR EACH ROW EXECUTE FUNCTION guard_purchase_order_receipt();
+
 INSERT INTO "Permission" ("id","key","description") VALUES
   (gen_random_uuid(),'procurement.read','View suppliers and purchase orders'),
   (gen_random_uuid(),'procurement.manage','Create and manage suppliers and purchase orders')
