@@ -19,7 +19,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm audit fix
+      - name: Refresh non-breaking audit fixes
+        run: npm audit fix || true
+      - name: Enforce high-severity audit gate
+        run: npm audit --audit-level=high
       - name: Commit refreshed lockfile
         run: |
           if git diff --quiet -- package-lock.json; then
