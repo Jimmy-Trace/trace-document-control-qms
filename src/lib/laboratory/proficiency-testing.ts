@@ -2,10 +2,12 @@ import { Prisma } from "@prisma/client";
 import type { AuthorizationContext } from "../security/authorization";
 import { requireAuthorization } from "../security/authorization";
 import { db } from "../db";
+import { QmsNotificationRouter } from "../notifications/qms-router";
 
 export class ProficiencyTestingError extends Error {}
 
 type EventStatus="SCHEDULED"|"OPEN"|"SUBMITTED"|"SCORED"|"CLOSED"|"CANCELLED";
+const notificationRouter=new QmsNotificationRouter();
 
 export class ProficiencyTestingService {
   async list(context:AuthorizationContext,organizationId:string){
@@ -29,6 +31,7 @@ export class ProficiencyTestingService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "ProficiencyTestingProgram" ("organizationId","programCode","providerName","laboratoryTestId","laboratoryMethodId","createdByUserId") VALUES (${input.organizationId}::uuid,${programCode},${providerName},${input.laboratoryTestId}::uuid,${input.laboratoryMethodId}::uuid,${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new ProficiencyTestingError("PT program could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"PT_PROGRAM_CREATED",entityType:"ProficiencyTestingProgram",entityId:row.id,metadata:{programCode,providerName,laboratoryTestId:input.laboratoryTestId,laboratoryMethodId:input.laboratoryMethodId}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.program.created",eventKey:`pt-program:${row.id}:created`,payload:{proficiencyTestingProgramId:row.id,programCode,providerName,laboratoryTestId:input.laboratoryTestId,laboratoryMethodId:input.laboratoryMethodId}});
       return row;
     });
   }
@@ -44,6 +47,7 @@ export class ProficiencyTestingService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "ProficiencyTestingEvent" ("organizationId","proficiencyTestingProgramId","eventCode","laboratoryMethodVersionId","dueAt","createdByUserId") VALUES (${input.organizationId}::uuid,${input.proficiencyTestingProgramId}::uuid,${eventCode},${input.laboratoryMethodVersionId}::uuid,${input.dueAt?new Date(input.dueAt):null},${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new ProficiencyTestingError("PT event could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"PT_EVENT_CREATED",entityType:"ProficiencyTestingEvent",entityId:row.id,metadata:{eventCode,proficiencyTestingProgramId:input.proficiencyTestingProgramId,laboratoryMethodVersionId:input.laboratoryMethodVersionId}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.event.created",eventKey:`pt-event:${row.id}:created`,payload:{proficiencyTestingEventId:row.id,proficiencyTestingProgramId:input.proficiencyTestingProgramId,eventCode,laboratoryMethodVersionId:input.laboratoryMethodVersionId,dueAt:input.dueAt??null}});
       return row;
     });
   }
@@ -58,6 +62,7 @@ export class ProficiencyTestingService {
       await tx.$executeRaw(Prisma.sql`UPDATE "ProficiencyTestingEvent" SET status=${input.toStatus}::"ProficiencyTestingEventStatus","updatedAt"=CURRENT_TIMESTAMP ${ts} WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.proficiencyTestingEventId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "ProficiencyTestingEventAction" ("organizationId","proficiencyTestingEventId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.proficiencyTestingEventId}::uuid,${current.status}::"ProficiencyTestingEventStatus",${input.toStatus}::"ProficiencyTestingEventStatus",${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:`PT_EVENT_${input.toStatus}`,entityType:"ProficiencyTestingEvent",entityId:input.proficiencyTestingEventId,reason,metadata:{fromStatus:current.status,toStatus:input.toStatus}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.event.status",eventKey:`pt-event:${input.proficiencyTestingEventId}:status:${input.toStatus}`,payload:{proficiencyTestingEventId:input.proficiencyTestingEventId,fromStatus:current.status,toStatus:input.toStatus,reason}});
       return{status:input.toStatus};
     });
   }
@@ -72,6 +77,7 @@ export class ProficiencyTestingService {
       await tx.$executeRaw(Prisma.sql`UPDATE "ProficiencyTestingEvent" SET status='SUBMITTED',"submittedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.proficiencyTestingEventId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "ProficiencyTestingEventAction" ("organizationId","proficiencyTestingEventId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.proficiencyTestingEventId}::uuid,'OPEN','SUBMITTED',${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"PT_RESULT_SUBMITTED",entityType:"ProficiencyTestingEvent",entityId:input.proficiencyTestingEventId,reason,metadata:{submissionId:submission?.id??null,evidenceFileId:input.evidenceFileId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.result.submitted",eventKey:`pt-event:${input.proficiencyTestingEventId}:submitted`,payload:{proficiencyTestingEventId:input.proficiencyTestingEventId,submissionId:submission?.id??null,evidenceFileId:input.evidenceFileId??null}});
       return submission;
     });
   }
@@ -86,6 +92,7 @@ export class ProficiencyTestingService {
       await tx.$executeRaw(Prisma.sql`UPDATE "ProficiencyTestingEvent" SET status='SCORED',"scoredAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.proficiencyTestingEventId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "ProficiencyTestingEventAction" ("organizationId","proficiencyTestingEventId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.proficiencyTestingEventId}::uuid,'SUBMITTED','SCORED',${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"PT_EVENT_SCORED",entityType:"ProficiencyTestingEvent",entityId:input.proficiencyTestingEventId,reason,metadata:{scoreId:score?.id??null,outcome:input.outcome,evidenceFileId:input.evidenceFileId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.event.scored",eventKey:`pt-event:${input.proficiencyTestingEventId}:scored`,payload:{proficiencyTestingEventId:input.proficiencyTestingEventId,scoreId:score?.id??null,outcome:input.outcome,evidenceFileId:input.evidenceFileId??null}});
       return score;
     });
   }
@@ -98,6 +105,7 @@ export class ProficiencyTestingService {
       if(!event||event.status!=="SCORED")throw new ProficiencyTestingError("Follow-up may only be recorded for a SCORED event");
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "ProficiencyTestingFollowUp" ("organizationId","proficiencyTestingEventId",description,"evidenceFileId","recordedByUserId") VALUES (${input.organizationId}::uuid,${input.proficiencyTestingEventId}::uuid,${description},${input.evidenceFileId??null}::uuid,${context.userId}::uuid) RETURNING id`))[0];
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"PT_FOLLOW_UP_RECORDED",entityType:"ProficiencyTestingEvent",entityId:input.proficiencyTestingEventId,metadata:{followUpId:row?.id??null,evidenceFileId:input.evidenceFileId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.pt.followup.recorded",eventKey:`pt-followup:${row?.id??input.proficiencyTestingEventId}:recorded`,payload:{proficiencyTestingEventId:input.proficiencyTestingEventId,followUpId:row?.id??null,evidenceFileId:input.evidenceFileId??null}});
       return row;
     });
   }

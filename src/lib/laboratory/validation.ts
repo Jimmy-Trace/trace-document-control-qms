@@ -2,8 +2,11 @@ import { Prisma } from "@prisma/client";
 import type { AuthorizationContext } from "../security/authorization";
 import { requireAuthorization } from "../security/authorization";
 import { db } from "../db";
+import { QmsNotificationRouter } from "../notifications/qms-router";
 
 export class LaboratoryValidationError extends Error {}
+
+const notificationRouter=new QmsNotificationRouter();
 
 export class LaboratoryValidationService {
   async createProject(context:AuthorizationContext,input:{organizationId:string;projectNumber:string;laboratoryMethodId:string;laboratoryMethodVersionId:string;title:string;objective:string}){
@@ -18,6 +21,7 @@ export class LaboratoryValidationService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "ValidationProject" ("organizationId","projectNumber","laboratoryMethodId","laboratoryMethodVersionId",title,objective,"createdByUserId") VALUES (${input.organizationId}::uuid,${projectNumber},${input.laboratoryMethodId}::uuid,${input.laboratoryMethodVersionId}::uuid,${title},${objective},${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new LaboratoryValidationError("Validation project could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"VALIDATION_PROJECT_CREATED",entityType:"ValidationProject",entityId:row.id,metadata:{projectNumber,laboratoryMethodId:input.laboratoryMethodId,laboratoryMethodVersionId:input.laboratoryMethodVersionId}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.validation.project.created",eventKey:`validation-project:${row.id}:created`,payload:{validationProjectId:row.id,projectNumber,laboratoryMethodId:input.laboratoryMethodId,laboratoryMethodVersionId:input.laboratoryMethodVersionId}});
       return row;
     });
   }
@@ -46,6 +50,7 @@ export class LaboratoryValidationService {
       await tx.$executeRaw(Prisma.sql`UPDATE "ValidationProject" SET status=${input.toStatus}::"ValidationProjectStatus","updatedAt"=CURRENT_TIMESTAMP ${nowColumn} WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.validationProjectId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "ValidationProjectActionEvent" ("organizationId","validationProjectId",action,"fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.validationProjectId}::uuid,${input.toStatus},${current.status}::"ValidationProjectStatus",${input.toStatus}::"ValidationProjectStatus",${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:`VALIDATION_PROJECT_${input.toStatus}`,entityType:"ValidationProject",entityId:input.validationProjectId,reason,metadata:{fromStatus:current.status,toStatus:input.toStatus}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.validation.project.status",eventKey:`validation-project:${input.validationProjectId}:status:${input.toStatus}`,payload:{validationProjectId:input.validationProjectId,fromStatus:current.status,toStatus:input.toStatus,reason}});
       return{status:input.toStatus};
     });
   }
@@ -59,6 +64,7 @@ export class LaboratoryValidationService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "ValidationResult" ("organizationId","validationProjectId","validationCriterionId",outcome,"observedResult","evidenceFileId","recordedByUserId") VALUES (${input.organizationId}::uuid,${input.validationProjectId}::uuid,${input.validationCriterionId}::uuid,${input.outcome}::"ValidationResultOutcome",${observedResult},${input.evidenceFileId??null}::uuid,${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new LaboratoryValidationError("Validation result could not be recorded");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"VALIDATION_RESULT_RECORDED",entityType:"ValidationProject",entityId:input.validationProjectId,metadata:{validationResultId:row.id,validationCriterionId:input.validationCriterionId,outcome:input.outcome,evidenceFileId:input.evidenceFileId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.validation.result.recorded",eventKey:`validation-result:${row.id}:recorded`,payload:{validationProjectId:input.validationProjectId,validationResultId:row.id,validationCriterionId:input.validationCriterionId,outcome:input.outcome}});
       return row;
     });
   }
@@ -77,6 +83,7 @@ export class LaboratoryValidationService {
         await tx.$executeRaw(Prisma.sql`INSERT INTO "LaboratoryTestStatusChange" ("organizationId","laboratoryTestId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${method.laboratoryTestId}::uuid,'DRAFT','ACTIVE',${reason},${context.userId}::uuid)`);
       }
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"LABORATORY_METHOD_ACTIVATED",entityType:"LaboratoryMethod",entityId:input.laboratoryMethodId,reason,metadata:{laboratoryTestId:method.laboratoryTestId}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"laboratory.method.activated",eventKey:`laboratory-method:${input.laboratoryMethodId}:activated`,payload:{laboratoryMethodId:input.laboratoryMethodId,laboratoryTestId:method.laboratoryTestId,reason}});
       return{methodStatus:"ACTIVE" as const,testStatus:"ACTIVE" as const};
     });
   }
