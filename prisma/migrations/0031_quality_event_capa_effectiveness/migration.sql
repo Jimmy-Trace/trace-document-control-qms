@@ -16,6 +16,7 @@ CREATE TABLE "QualityCapaAction" (
   "createdByUserId" uuid NOT NULL,
   "createdAt" timestamptz(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "QualityCapaAction_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "QualityCapaAction_org_id_key" UNIQUE ("organizationId","id"),
   CONSTRAINT "QualityCapaAction_event_fkey" FOREIGN KEY ("organizationId","eventId") REFERENCES "QualityEvent"("organizationId","id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "QualityCapaAction_owner_fkey" FOREIGN KEY ("organizationId","ownerUserId") REFERENCES "User"("organizationId","id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "QualityCapaAction_creator_fkey" FOREIGN KEY ("organizationId","createdByUserId") REFERENCES "User"("organizationId","id") ON DELETE RESTRICT ON UPDATE CASCADE,
