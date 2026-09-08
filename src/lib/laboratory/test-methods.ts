@@ -47,7 +47,7 @@ export class LaboratoryTestMethodService {
       const method=(await tx.$queryRaw<Array<{id:string;status:string}>>(Prisma.sql`SELECT id,status FROM "LaboratoryMethod" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.laboratoryMethodId}::uuid`))[0];
       if(!method||method.status==="RETIRED")throw new LaboratoryTestMethodValidationError("Laboratory method not found or retired");
       if(input.procedureFileId){
-        const file=(await tx.$queryRaw<Array<{id:string;status:string}>>(Prisma.sql`SELECT id,status FROM "File" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.procedureFileId}::uuid`))[0];
+        const file=(await tx.$queryRaw<Array<{id:string;status:string}>>(Prisma.sql`SELECT id,status FROM "FileObject" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.procedureFileId}::uuid`))[0];
         if(!file||file.status!=="AVAILABLE")throw new LaboratoryTestMethodValidationError("Method procedure evidence must be an AVAILABLE same-tenant file");
       }
       const row=(await tx.$queryRaw<Array<{id:string;createdAt:Date}>>(Prisma.sql`INSERT INTO "LaboratoryMethodVersion" ("organizationId","laboratoryMethodId","versionLabel","changeSummary","procedureFileId","createdByUserId") VALUES (${input.organizationId}::uuid,${input.laboratoryMethodId}::uuid,${versionLabel},${changeSummary},${input.procedureFileId??null}::uuid,${context.userId}::uuid) RETURNING id,"createdAt"`))[0];
