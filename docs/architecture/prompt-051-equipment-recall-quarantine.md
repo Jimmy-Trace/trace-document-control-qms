@@ -1,0 +1,20 @@
+# Prompt 051 — Equipment Recall and Quarantine
+
+## Scope
+Add governed equipment recall/quarantine controls after the equipment operations workspace slice.
+
+## Controls
+- equipment recalls require `equipment.manage` and capture controlled reason and affected-scope summary;
+- only one open recall may exist per tenant/equipment pair;
+- opening a recall creates append-only QUARANTINED evidence and immediately makes the equipment operationally not usable;
+- closing a recall creates append-only RELEASED evidence and requires a controlled closure reason;
+- recall closure is blocked while any equipment compliance hold remains active;
+- tenant/equipment/user relationships are enforced by database foreign keys and server-side authorization;
+- open/close actions append transactional audit evidence;
+- recall history is readable by `equipment.read` users.
+
+## Integrity
+Recall/quarantine is an operational control separate from administrative equipment status. The equipment may remain administratively ACTIVE while an open recall makes it NOT USABLE. Quarantine evidence is append-only and cannot be rewritten or deleted.
+
+## Boundary
+Broader escalation, inventory/material linkage, automated recall-source integration, and final Prompt 051 completeness review remain subsequent work.
