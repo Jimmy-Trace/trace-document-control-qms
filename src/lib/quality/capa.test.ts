@@ -5,8 +5,9 @@ import { QualityCapaService, QualityCapaValidationError, type CapaRecord, type E
 const organizationId="00000000-0000-0000-0000-000000000001";const userId="00000000-0000-0000-0000-000000000002";const eventId="00000000-0000-0000-0000-000000000003";const actionId="00000000-0000-0000-0000-000000000004";
 const context=(permissions:string[]):AuthorizationContext=>({organizationId,userId,userState:"ACTIVE",grants:permissions.map(permission=>({permission,scopeType:"ORGANIZATION" as const,scopeId:null}))});
 const action: CapaRecord={id:actionId,organizationId,eventId,actionType:"CORRECTIVE",description:"Correct process",ownerUserId:userId,dueAt:new Date("2026-09-30"),status:"OPEN",completedAt:null,completionEvidence:null,createdByUserId:userId,createdAt:new Date()};
+const completedAction: CapaRecord={...action,status:"COMPLETED",completedAt:new Date(),completionEvidence:"Implemented"};
 const check: EffectivenessCheckRecord={id:"00000000-0000-0000-0000-000000000005",organizationId,eventId,capaActionId:actionId,result:"PASS",evidence:"No recurrence",checkedByUserId:userId,checkedAt:new Date()};
-const store=():QualityCapaStore=>({list:vi.fn(async()=>[]),create:vi.fn(async()=>action),complete:vi.fn(async()=>({...action,status:"COMPLETED",completedAt:new Date(),completionEvidence:"Implemented"})),verify:vi.fn(async()=>check)});
+const store=():QualityCapaStore=>({list:vi.fn(async()=>[]),create:vi.fn(async()=>action),complete:vi.fn(async()=>completedAction),verify:vi.fn(async()=>check)});
 
 describe("QualityCapaService",()=>{
   it("requires read permission for CAPA browsing",()=>{const service=new QualityCapaService(store());expect(()=>service.list(context([]),organizationId,eventId)).toThrow("Access denied");});
