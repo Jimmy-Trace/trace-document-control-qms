@@ -2,6 +2,8 @@ ALTER TABLE "InventoryReservation" ADD COLUMN "consumedAt" timestamptz(3);
 ALTER TABLE "InventoryReservation" ADD COLUMN "consumptionTransactionId" uuid;
 ALTER TABLE "InventoryReservation" ADD CONSTRAINT "InventoryReservation_consumption_tx_fkey" FOREIGN KEY ("consumptionTransactionId") REFERENCES "InventoryTransaction"("id") ON DELETE RESTRICT;
 
+ALTER TABLE "MaterialLotStatusChange" ALTER COLUMN "actorUserId" DROP NOT NULL;
+
 CREATE TABLE "InventoryAutomationEvent" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "organizationId" uuid NOT NULL,
