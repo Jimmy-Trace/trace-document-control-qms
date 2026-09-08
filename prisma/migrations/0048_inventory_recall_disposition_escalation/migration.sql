@@ -1,6 +1,8 @@
 CREATE TYPE "MaterialRecallImpactDisposition" AS ENUM ('NO_IMPACT','POTENTIAL_IMPACT','CONFIRMED_IMPACT');
 CREATE TYPE "MaterialRecallImpactAction" AS ENUM ('DISPOSITION','CLOSURE');
 
+ALTER TABLE "MaterialRecallImpact" ADD CONSTRAINT "MaterialRecallImpact_org_id_key" UNIQUE ("organizationId","id");
+
 CREATE TABLE "MaterialRecallImpactActionEvent" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "organizationId" uuid NOT NULL,
@@ -10,7 +12,7 @@ CREATE TABLE "MaterialRecallImpactActionEvent" (
   "reason" text NOT NULL,
   "actorUserId" uuid NOT NULL,
   "createdAt" timestamptz(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "MaterialRecallImpactActionEvent_impact_fkey" FOREIGN KEY ("materialRecallImpactId") REFERENCES "MaterialRecallImpact"("id") ON DELETE RESTRICT,
+  CONSTRAINT "MaterialRecallImpactActionEvent_impact_fkey" FOREIGN KEY ("organizationId","materialRecallImpactId") REFERENCES "MaterialRecallImpact"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecallImpactActionEvent_actor_fkey" FOREIGN KEY ("organizationId","actorUserId") REFERENCES "User"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecallImpactActionEvent_reason_check" CHECK (length(btrim("reason"))>0),
   CONSTRAINT "MaterialRecallImpactActionEvent_action_check" CHECK (("action"='DISPOSITION' AND "disposition" IS NOT NULL) OR ("action"='CLOSURE' AND "disposition" IS NULL))
