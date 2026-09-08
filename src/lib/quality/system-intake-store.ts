@@ -20,7 +20,7 @@ export type SystemQualityEventInput = {
 export class PrismaQualityEventSystemIntakeStore {
   async ingest(input: SystemQualityEventInput) {
     return db.$transaction(async tx => {
-      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${input.organizationId}:${input.sourceSystem}:${input.sourceKey}`},0))`);
+      await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${input.organizationId}:${input.sourceSystem}:${input.sourceKey}`},0)) IS NULL AS "locked"`);
       const existing = await tx.$queryRaw<QualityEventRecord[]>(Prisma.sql`
         SELECT e.* FROM "QualityEventSystemTrigger" t
         JOIN "QualityEvent" e ON e."organizationId"=t."organizationId" AND e."id"=t."eventId"
