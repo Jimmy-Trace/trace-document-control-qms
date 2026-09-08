@@ -6,13 +6,24 @@ export class PrismaEquipmentComplianceStore implements EquipmentComplianceStore{
   listHolds(organizationId:string,equipmentId:string){return db.$queryRaw<EquipmentHoldRecord[]>(Prisma.sql`SELECT * FROM "EquipmentComplianceHold" WHERE "organizationId"=${organizationId}::uuid AND "equipmentId"=${equipmentId}::uuid ORDER BY "detectedAt" DESC`);}
   async detectOverdue(){
     return db.$transaction(async tx=>{
-      const rows=await tx.$queryRaw<Array<{organizationId:string;equipmentId:string;kind:string;dueAt:Date}>>(Prisma.sql`
-        SELECT "organizationId",id AS "equipmentId",'CALIBRATION_OVERDUE' AS kind,"nextCalibrationDueAt" AS "dueAt" FROM "Equipment" WHERE status='ACTIVE' AND "calibrationRequired"=true AND "nextCalibrationDueAt"<CURRENT_DATE
+      const rows=await tx.$queryRaw<Array<{organizationId:string;equipmentId:string;equipmentNumber:string;kind:string;dueAt:Date}>>(Prisma.sql`
+        SELECT "organizationId",id AS "equipmentId","equipmentNumber",'CALIBRATION_OVERDUE' AS kind,"nextCalibrationDueAt" AS "dueAt" FROM "Equipment" WHERE status='ACTIVE' AND "calibrationRequired"=true AND "nextCalibrationDueAt"<CURRENT_DATE
         UNION ALL
-        SELECT "organizationId",id AS "equipmentId",'MAINTENANCE_OVERDUE' AS kind,"nextMaintenanceDueAt" AS "dueAt" FROM "Equipment" WHERE status='ACTIVE' AND "maintenanceRequired"=true AND "nextMaintenanceDueAt"<CURRENT_DATE
+        SELECT "organizationId",id AS "equipmentId","equipmentNumber",'MAINTENANCE_OVERDUE' AS kind,"nextMaintenanceDueAt" AS "dueAt" FROM "Equipment" WHERE status='ACTIVE' AND "maintenanceRequired"=true AND "nextMaintenanceDueAt"<CURRENT_DATE
       `);
       let created=0;
-      for(const row of rows){const result=await tx.$executeRaw(Prisma.sql`INSERT INTO "EquipmentComplianceHold" ("organizationId","equipmentId","kind","dueAt") VALUES (${row.organizationId}::uuid,${row.equipmentId}::uuid,${row.kind}::"EquipmentComplianceKind",${row.dueAt}) ON CONFLICT ("organizationId","equipmentId","kind","dueAt") DO NOTHING`);created+=result;}
+      for(const row of rows){
+        const inserted=await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "EquipmentComplianceHold" ("organizationId","equipmentId","kind","dueAt") VALUES (${row.organizationId}::uuid,${row.equipmentId}::uuid,${row.kind}::"EquipmentComplianceKind",${row.dueAt}) ON CONFLICT ("organizationId","equipmentId","kind","dueAt") DO NOTHING RETURNING id`);
+        if(!inserted[0])continue; created++;
+        const recipients=await tx.$queryRaw<Array<{userId:string}>>(Prisma.sql`
+          SELECT DISTINCT ur."userId" FROM "UserRole" ur
+          JOIN "User" u ON u."organizationId"=ur."organizationId" AND u.id=ur."userId" AND u.status='ACTIVE'
+          JOIN "RolePermission" rp ON rp."roleId"=ur."roleId"
+          JOIN "Permission" p ON p.id=rp."permissionId" AND p.key='equipment.manage'
+          WHERE ur."organizationId"=${row.organizationId}::uuid
+        `);
+        if(recipients.length)await tx.notificationOutbox.createMany({data:recipients.map(({userId})=>({organizationId:row.organizationId,recipientUserId:userId,eventKey:`equipment-hold:${inserted[0].id}`,templateKey:"equipment-compliance-hold",payload:{equipmentId:row.equipmentId,equipmentNumber:row.equipmentNumber,kind:row.kind,dueAt:row.dueAt.toISOString().slice(0,10)}})),skipDuplicates:true});
+      }
       return created;
     });
   }
