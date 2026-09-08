@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuthorizationContext } from "../security/authorization";
 import { CompetencyService, CompetencyValidationError, type CompetencyStore } from "./competency";
 
-const context=(permissions:string[]):AuthorizationContext=>({organizationId:"00000000-0000-0000-0000-000000000001",userId:"00000000-0000-0000-0000-000000000002",permissions} as AuthorizationContext);
+const context = (permissions: string[]): AuthorizationContext => ({
+  organizationId: "00000000-0000-0000-0000-000000000001",
+  userId: "00000000-0000-0000-0000-000000000002",
+  userState: "ACTIVE",
+  grants: permissions.map((permission) => ({ permission, scopeType: "ORGANIZATION" as const, scopeId: null })),
+});
 const store=():CompetencyStore=>({
   listPrograms:vi.fn(async()=>[]), createProgram:vi.fn(async i=>({id:"p",...i,active:true,createdAt:new Date(),updatedAt:new Date()})),
   listElements:vi.fn(async()=>[]), createElement:vi.fn(async i=>({id:"e",...i,createdAt:new Date()})),
