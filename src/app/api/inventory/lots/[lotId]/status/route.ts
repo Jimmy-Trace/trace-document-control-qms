@@ -1,0 +1,8 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { InventoryService,InventoryValidationError } from "@/lib/inventory/inventory";
+import { PrismaInventoryStore } from "@/lib/inventory/inventory-store";
+const service=new InventoryService(new PrismaInventoryStore());
+const schema=z.object({status:z.enum(["ACCEPTED","QUARANTINED","REJECTED","EXPIRED","RECALLED","DEPLETED"]),reason:z.string().max(2000)});
+export async function POST(request:NextRequest,{params}:{params:Promise<{lotId:string}>}){try{const context=await authenticateRequest(request);const {lotId}=await params;if(!z.string().uuid().safeParse(lotId).success)return NextResponse.json({error:"Invalid lot identifier"},{status:422});const input=schema.parse(await request.json());return NextResponse.json({data:await service.transitionLot(context,{organizationId:context.organizationId,lotId,...input})});}catch(error){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid lot status request"},{status:422});if(error instanceof InventoryValidationError)return NextResponse.json({error:error.message},{status:409});return NextResponse.json({error:"Material lot status operation failed"},{status:500});}}
