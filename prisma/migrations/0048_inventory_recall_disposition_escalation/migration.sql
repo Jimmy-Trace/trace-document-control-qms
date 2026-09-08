@@ -18,6 +18,20 @@ CREATE TABLE "MaterialRecallImpactActionEvent" (
   CONSTRAINT "MaterialRecallImpactActionEvent_action_check" CHECK (("action"='DISPOSITION' AND "disposition" IS NOT NULL) OR ("action"='CLOSURE' AND "disposition" IS NULL))
 );
 CREATE INDEX "MaterialRecallImpactActionEvent_org_impact_idx" ON "MaterialRecallImpactActionEvent"("organizationId","materialRecallImpactId","createdAt" DESC);
+CREATE UNIQUE INDEX "MaterialRecallImpactActionEvent_one_closure" ON "MaterialRecallImpactActionEvent"("organizationId","materialRecallImpactId") WHERE "action"='CLOSURE';
+
+CREATE OR REPLACE FUNCTION enforce_material_recall_impact_action_lifecycle() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM "MaterialRecallImpactActionEvent" a WHERE a."organizationId"=NEW."organizationId" AND a."materialRecallImpactId"=NEW."materialRecallImpactId" AND a.action='CLOSURE') THEN
+    RAISE EXCEPTION 'Closed recall impact cannot receive additional actions';
+  END IF;
+  IF NEW.action='CLOSURE' AND NOT EXISTS (SELECT 1 FROM "MaterialRecallImpactActionEvent" a WHERE a."organizationId"=NEW."organizationId" AND a."materialRecallImpactId"=NEW."materialRecallImpactId" AND a.action='DISPOSITION') THEN
+    RAISE EXCEPTION 'Recall impact requires a disposition before closure';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER "MaterialRecallImpactActionEvent_lifecycle" BEFORE INSERT ON "MaterialRecallImpactActionEvent" FOR EACH ROW EXECUTE FUNCTION enforce_material_recall_impact_action_lifecycle();
 
 CREATE TABLE "MaterialRecallEscalationEvent" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
