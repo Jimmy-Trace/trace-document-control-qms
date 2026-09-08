@@ -1,0 +1,10 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { EquipmentService,EquipmentValidationError } from "@/lib/equipment/equipment";
+import { PrismaEquipmentStore } from "@/lib/equipment/equipment-store";
+const service=new EquipmentService(new PrismaEquipmentStore());
+const schema=z.object({equipmentNumber:z.string().max(80),name:z.string().max(240),manufacturer:z.string().max(240).nullish(),model:z.string().max(240).nullish(),serialNumber:z.string().max(240).nullish(),siteId:z.string().uuid().nullish(),departmentId:z.string().uuid().nullish(),receivedAt:z.coerce.date().nullish(),calibrationRequired:z.boolean().optional(),calibrationIntervalDays:z.number().int().positive().nullish(),nextCalibrationDueAt:z.coerce.date().nullish(),maintenanceRequired:z.boolean().optional(),maintenanceIntervalDays:z.number().int().positive().nullish(),nextMaintenanceDueAt:z.coerce.date().nullish()});
+export async function GET(request:NextRequest){try{const context=await authenticateRequest(request);return NextResponse.json({data:await service.list(context,context.organizationId)});}catch(error){return respond(error);}}
+export async function POST(request:NextRequest){try{const context=await authenticateRequest(request);const input=schema.parse(await request.json());return NextResponse.json({data:await service.create(context,{organizationId:context.organizationId,...input})},{status:201});}catch(error){return respond(error);}}
+function respond(error:unknown){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid equipment request"},{status:422});if(error instanceof EquipmentValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Equipment operation failed"},{status:500});}
