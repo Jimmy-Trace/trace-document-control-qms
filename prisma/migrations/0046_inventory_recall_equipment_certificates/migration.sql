@@ -47,6 +47,7 @@ CREATE TABLE "MaterialRecall" (
   CONSTRAINT "MaterialRecall_file_fkey" FOREIGN KEY ("organizationId","evidenceFileId") REFERENCES "FileObject"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecall_actor_fkey" FOREIGN KEY ("organizationId","createdByUserId") REFERENCES "User"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecall_reference_unique" UNIQUE ("organizationId","externalReference"),
+  CONSTRAINT "MaterialRecall_org_id_unique" UNIQUE ("organizationId","id"),
   CONSTRAINT "MaterialRecall_reason_check" CHECK (length(btrim("reason"))>0)
 );
 
@@ -57,7 +58,7 @@ CREATE TABLE "MaterialRecallLot" (
   "materialLotId" uuid NOT NULL,
   "previousStatus" "MaterialLotStatus" NOT NULL,
   "createdAt" timestamptz(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "MaterialRecallLot_recall_fkey" FOREIGN KEY ("materialRecallId") REFERENCES "MaterialRecall"("id") ON DELETE RESTRICT,
+  CONSTRAINT "MaterialRecallLot_recall_fkey" FOREIGN KEY ("organizationId","materialRecallId") REFERENCES "MaterialRecall"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecallLot_lot_fkey" FOREIGN KEY ("organizationId","materialLotId") REFERENCES "MaterialLot"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "MaterialRecallLot_unique" UNIQUE ("organizationId","materialRecallId","materialLotId")
 );
