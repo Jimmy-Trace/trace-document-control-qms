@@ -1,0 +1,1 @@
+export function equipmentEscalationLevels(ageDays:number):(1|2|3)[]{const levels:(1|2|3)[]=[];if(ageDays>=1)levels.push(1);if(ageDays>=7)levels.push(2);if(ageDays>=30)levels.push(3);return levels;}
