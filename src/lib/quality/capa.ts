@@ -1,0 +1,41 @@
+import type { AuthorizationContext } from "../security/authorization";
+import { requireAuthorization } from "../security/authorization";
+
+export class QualityCapaValidationError extends Error {}
+export type CapaActionType="CORRECTIVE"|"PREVENTIVE";
+export type CapaActionStatus="OPEN"|"COMPLETED";
+export type EffectivenessResult="PASS"|"FAIL";
+export type CapaRecord={id:string;organizationId:string;eventId:string;actionType:CapaActionType;description:string;ownerUserId:string;dueAt:Date;status:CapaActionStatus;completedAt:Date|null;completionEvidence:string|null;createdByUserId:string;createdAt:Date};
+export type EffectivenessCheckRecord={id:string;organizationId:string;eventId:string;capaActionId:string;result:EffectivenessResult;evidence:string;checkedByUserId:string;checkedAt:Date};
+
+export interface QualityCapaStore{
+  list(organizationId:string,eventId:string):Promise<CapaRecord[]>;
+  create(input:{organizationId:string;eventId:string;actionType:CapaActionType;description:string;ownerUserId:string;dueAt:Date;actorUserId:string}):Promise<CapaRecord>;
+  complete(input:{organizationId:string;eventId:string;capaActionId:string;completionEvidence:string;actorUserId:string}):Promise<CapaRecord>;
+  verify(input:{organizationId:string;eventId:string;capaActionId:string;result:EffectivenessResult;evidence:string;actorUserId:string}):Promise<EffectivenessCheckRecord>;
+}
+
+export class QualityCapaService{
+  constructor(private readonly store:QualityCapaStore){}
+  list(context:AuthorizationContext,organizationId:string,eventId:string){requireAuthorization(context,{organizationId,permission:"quality_event.read"});return this.store.list(organizationId,eventId);}
+  create(context:AuthorizationContext,input:{organizationId:string;eventId:string;actionType:CapaActionType;description:string;ownerUserId:string;dueAt:Date}){
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"quality_event.manage"});
+    const description=input.description.trim();
+    if(!description||description.length>5000)throw new QualityCapaValidationError("CAPA action description is required and must not exceed 5000 characters");
+    if(!input.ownerUserId)throw new QualityCapaValidationError("CAPA action owner is required");
+    if(Number.isNaN(input.dueAt.getTime()))throw new QualityCapaValidationError("CAPA action due date is invalid");
+    return this.store.create({...input,description,actorUserId:context.userId});
+  }
+  complete(context:AuthorizationContext,input:{organizationId:string;eventId:string;capaActionId:string;completionEvidence:string}){
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"quality_event.manage"});
+    const completionEvidence=input.completionEvidence.trim();
+    if(!completionEvidence||completionEvidence.length>5000)throw new QualityCapaValidationError("CAPA completion evidence is required and must not exceed 5000 characters");
+    return this.store.complete({...input,completionEvidence,actorUserId:context.userId});
+  }
+  verify(context:AuthorizationContext,input:{organizationId:string;eventId:string;capaActionId:string;result:EffectivenessResult;evidence:string}){
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"quality_event.manage"});
+    const evidence=input.evidence.trim();
+    if(!evidence||evidence.length>5000)throw new QualityCapaValidationError("Effectiveness evidence is required and must not exceed 5000 characters");
+    return this.store.verify({...input,evidence,actorUserId:context.userId});
+  }
+}
