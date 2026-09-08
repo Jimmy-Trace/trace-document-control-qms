@@ -1,9 +1,8 @@
 name: Refresh js-yaml lockfile
 
 on:
-  push:
-    branches:
-      - codex/prompt-055-inventory-equipment-notification-producers
+  pull_request:
+    types: [synchronize]
 
 permissions:
   contents: write
