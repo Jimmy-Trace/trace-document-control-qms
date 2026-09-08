@@ -1,0 +1,11 @@
+import { describe,expect,it,vi } from "vitest";
+import type { AuthorizationContext } from "../security/authorization";
+import { EquipmentOperationsService,EquipmentOperationsValidationError,type EquipmentOperationsStore } from "./operations";
+const organizationId="00000000-0000-0000-0000-000000000001",userId="00000000-0000-0000-0000-000000000002",equipmentId="00000000-0000-0000-0000-000000000003";
+const context=(permissions:string[]):AuthorizationContext=>({organizationId,userId,userState:"ACTIVE",grants:permissions.map(permission=>({permission,scopeType:"ORGANIZATION" as const,scopeId:null}))});
+const store=():EquipmentOperationsStore=>({listServiceRecords:vi.fn(async()=>[]),createServiceRecord:vi.fn(async input=>({id:"00000000-0000-0000-0000-000000000004",organizationId:input.organizationId,equipmentId:input.equipmentId,servicedAt:input.servicedAt,provider:input.provider,description:input.description,outcome:input.outcome,evidenceFileId:input.evidenceFileId,createdByUserId:input.actorUserId,createdAt:new Date()})),analytics:vi.fn(async()=>({total:0,active:0,outOfService:0,retired:0,activeHolds:0,calibrationDue30:0,maintenanceDue30:0,serviceFailures90:0})),workspace:vi.fn(async()=>[])});
+describe("EquipmentOperationsService",()=>{
+ it("requires equipment.read for analytics",()=>{expect(()=>new EquipmentOperationsService(store()).analytics(context([]),organizationId)).toThrow("Access denied");});
+ it("requires equipment.manage for service records",()=>{expect(()=>new EquipmentOperationsService(store()).createServiceRecord(context(["equipment.read"]),{organizationId,equipmentId,servicedAt:new Date(),description:"Repair",outcome:"COMPLETED"})).toThrow("Access denied");});
+ it("rejects blank service descriptions",()=>{expect(()=>new EquipmentOperationsService(store()).createServiceRecord(context(["equipment.manage"]),{organizationId,equipmentId,servicedAt:new Date(),description:" ",outcome:"COMPLETED"})).toThrow(EquipmentOperationsValidationError);});
+});
