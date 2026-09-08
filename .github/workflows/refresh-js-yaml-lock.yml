@@ -1,0 +1,34 @@
+name: Refresh js-yaml lockfile
+
+on:
+  push:
+    branches:
+      - codex/prompt-055-inventory-equipment-notification-producers
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/prompt-055-inventory-equipment-notification-producers
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm audit fix
+      - name: Commit refreshed lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile change required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Refresh js-yaml security lockfile"
+          git push origin HEAD:codex/prompt-055-inventory-equipment-notification-producers
