@@ -1,0 +1,9 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { InventoryWorkspaceService } from "@/lib/inventory/inventory-workspace";
+import { InventoryValidationError } from "@/lib/inventory/inventory";
+const service=new InventoryWorkspaceService();
+const schema=z.object({action:z.literal("issue_label"),lotId:z.string().uuid()});
+export async function GET(request:NextRequest){try{const context=await authenticateRequest(request);return NextResponse.json({data:await service.summary(context,context.organizationId)});}catch(error){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});return NextResponse.json({error:"Unable to load inventory workspace"},{status:500});}}
+export async function POST(request:NextRequest){try{const context=await authenticateRequest(request);const input=schema.parse(await request.json());return NextResponse.json({data:await service.issueLabel(context,{organizationId:context.organizationId,lotId:input.lotId})},{status:201});}catch(error){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid inventory workspace request"},{status:422});if(error instanceof InventoryValidationError)return NextResponse.json({error:error.message},{status:409});return NextResponse.json({error:"Inventory workspace operation failed"},{status:500});}}
