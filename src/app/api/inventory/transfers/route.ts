@@ -1,0 +1,8 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { InventoryService,InventoryValidationError } from "@/lib/inventory/inventory";
+import { PrismaInventoryStore } from "@/lib/inventory/inventory-store";
+const service=new InventoryService(new PrismaInventoryStore());
+const schema=z.object({lotId:z.string().uuid(),quantity:z.number().positive(),unitOfMeasure:z.string().max(80),fromSiteId:z.string().uuid().nullish(),fromDepartmentId:z.string().uuid().nullish(),toSiteId:z.string().uuid().nullish(),toDepartmentId:z.string().uuid().nullish(),reason:z.string().max(2000),transferKey:z.string().max(240),occurredAt:z.coerce.date()});
+export async function POST(request:NextRequest){try{const context=await authenticateRequest(request);const input=schema.parse(await request.json());return NextResponse.json({data:await service.transfer(context,{organizationId:context.organizationId,...input})},{status:201});}catch(error){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid inventory transfer request"},{status:422});if(error instanceof InventoryValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Inventory transfer operation failed"},{status:500});}}
