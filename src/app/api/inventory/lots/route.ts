@@ -1,0 +1,10 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { InventoryService,InventoryValidationError } from "@/lib/inventory/inventory";
+import { PrismaInventoryStore } from "@/lib/inventory/inventory-store";
+const service=new InventoryService(new PrismaInventoryStore());
+const schema=z.object({materialId:z.string().uuid(),lotNumber:z.string().max(120),receivedAt:z.coerce.date(),expirationDate:z.coerce.date().nullish(),quantityReceived:z.number().nonnegative().nullish(),unitOfMeasure:z.string().max(80).nullish(),siteId:z.string().uuid().nullish(),departmentId:z.string().uuid().nullish(),evidenceFileId:z.string().uuid().nullish()});
+export async function GET(request:NextRequest){try{const context=await authenticateRequest(request);const materialId=request.nextUrl.searchParams.get("materialId")||undefined;if(materialId&&!z.string().uuid().safeParse(materialId).success)return NextResponse.json({error:"Invalid material identifier"},{status:422});return NextResponse.json({data:await service.listLots(context,context.organizationId,materialId)});}catch(error){return respond(error);}}
+export async function POST(request:NextRequest){try{const context=await authenticateRequest(request);const input=schema.parse(await request.json());return NextResponse.json({data:await service.receiveLot(context,{organizationId:context.organizationId,...input})},{status:201});}catch(error){return respond(error);}}
+function respond(error:unknown){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid material lot request"},{status:422});if(error instanceof InventoryValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Material lot operation failed"},{status:500});}
