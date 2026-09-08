@@ -73,8 +73,8 @@ export class AuditAccreditationService {
       const current=(await tx.$queryRaw<Array<{status:"PLANNED"|"IN_PROGRESS"|"COMPLETED"|"CANCELLED"}>>(Prisma.sql`SELECT status FROM "Audit" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.auditId}::uuid FOR UPDATE`))[0];
       if(!current)throw new AuditAccreditationError("Audit not found");
       if(input.toStatus==="COMPLETED"){
-        const open=(await tx.$queryRaw<Array<{count:bigint}>>(Prisma.sql`SELECT count(*)::bigint AS count FROM "AuditFinding" WHERE "organizationId"=${input.organizationId}::uuid AND "auditId"=${input.auditId}::uuid AND status<>'CLOSED'`))[0]?.count??0n;
-        if(open>0n)throw new AuditAccreditationError("Audit cannot complete while findings remain open");
+        const open=(await tx.$queryRaw<Array<{count:number}>>(Prisma.sql`SELECT count(*)::integer AS count FROM "AuditFinding" WHERE "organizationId"=${input.organizationId}::uuid AND "auditId"=${input.auditId}::uuid AND status<>'CLOSED'`))[0]?.count??0;
+        if(open>0)throw new AuditAccreditationError("Audit cannot complete while findings remain open");
       }
       const timestamps=input.toStatus==="IN_PROGRESS"?Prisma.sql`,"startedAt"=COALESCE("startedAt",CURRENT_TIMESTAMP)`:input.toStatus==="COMPLETED"?Prisma.sql`,"completedAt"=CURRENT_TIMESTAMP`:Prisma.empty;
       await tx.$executeRaw(Prisma.sql`UPDATE "Audit" SET status=${input.toStatus}::"AuditStatus","updatedAt"=CURRENT_TIMESTAMP ${timestamps} WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.auditId}::uuid`);
