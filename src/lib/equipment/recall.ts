@@ -2,7 +2,7 @@ import type { AuthorizationContext } from "../security/authorization";
 import { requireAuthorization } from "../security/authorization";
 
 export class EquipmentRecallValidationError extends Error {}
-export type EquipmentRecallRecord={id:string;organizationId:string;equipmentId:string;reason:string;scopeSummary:string;openedByUserId:string;openedAt:Date;status:"OPEN"|"CLOSED";closedByUserId:string|null;closedAt:Date|null;closureReason:string|null};
+export type EquipmentRecallRecord={id:string;organizationId:string;equipmentId:string;reason:string;scopeSummary:string;openedByUserId:string|null;openedAt:Date;status:"OPEN"|"CLOSED";closedByUserId:string|null;closedAt:Date|null;closureReason:string|null};
 export interface EquipmentRecallStore{
   list(organizationId:string,equipmentId:string):Promise<EquipmentRecallRecord[]>;
   open(input:{organizationId:string;equipmentId:string;reason:string;scopeSummary:string;actorUserId:string}):Promise<EquipmentRecallRecord>;
