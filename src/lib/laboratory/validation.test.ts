@@ -7,7 +7,12 @@ vi.mock("../db",()=>({db:{$transaction:vi.fn()}}));
 
 import { db } from "../db";
 
-const context:AuthorizationContext={organizationId:"11111111-1111-1111-1111-111111111111",userId:"22222222-2222-2222-2222-222222222222",permissions:new Set(["lab_test.manage"]),siteIds:new Set<string>(),departmentIds:new Set<string>()};
+const context:AuthorizationContext={
+  organizationId:"11111111-1111-1111-1111-111111111111",
+  userId:"22222222-2222-2222-2222-222222222222",
+  userState:"ACTIVE",
+  grants:[{permission:"lab_test.manage",scopeType:"ORGANIZATION",scopeId:null}],
+};
 
 describe("LaboratoryValidationService",()=>{
   beforeEach(()=>vi.clearAllMocks());
