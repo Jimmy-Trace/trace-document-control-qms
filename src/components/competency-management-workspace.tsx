@@ -53,7 +53,7 @@ export function CompetencyManagementWorkspace({ canManage, today }: { canManage:
   }, []);
 
   useEffect(() => {
-    if (!selectedProgramId) { setElements([]); return; }
+    if (!selectedProgramId) return;
     let cancelled = false;
     void fetch(`/api/training/competency/elements?programId=${encodeURIComponent(selectedProgramId)}`, { credentials: "same-origin" })
       .then(async (response) => response.ok ? response.json() : null)
@@ -115,7 +115,7 @@ export function CompetencyManagementWorkspace({ canManage, today }: { canManage:
       <form onSubmit={createElement} className="admin-form"><label>Program<select name="programId" defaultValue="" required><option value="" disabled>Select program</option>{programs.filter((program) => program.active).map((program) => <option key={program.id} value={program.id}>{program.code} · {program.title}</option>)}</select></label><label>Element code<input name="code" maxLength={80} required /></label><label>Element title<input name="title" maxLength={240} required /></label><label>Method<input name="method" maxLength={500} /></label><label>Sort order<input name="sortOrder" type="number" min={0} defaultValue={0} /></label><label><input name="required" type="checkbox" defaultChecked /> Required element</label><button type="submit" disabled={busy}>Add competency element</button></form>
       <form onSubmit={createAssessment} className="admin-form">
         <label>Employee<select name="employeeId" defaultValue="" required><option value="" disabled>Select employee</option>{employees.filter((employee) => employee.status !== "TERMINATED").map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeNumber} · {employee.lastName}, {employee.firstName}</option>)}</select></label>
-        <label>Program<select name="programId" value={selectedProgramId} onChange={(event) => setSelectedProgramId(event.target.value)} required><option value="" disabled>Select program</option>{programs.filter((program) => program.active).map((program) => <option key={program.id} value={program.id}>{program.code} · {program.title}</option>)}</select></label>
+        <label>Program<select name="programId" value={selectedProgramId} onChange={(event) => { setElements([]); setSelectedProgramId(event.target.value); }} required><option value="" disabled>Select program</option>{programs.filter((program) => program.active).map((program) => <option key={program.id} value={program.id}>{program.code} · {program.title}</option>)}</select></label>
         <label>Assessed at<input name="assessedAt" type="datetime-local" required /></label><label>Overall outcome<select name="outcome" defaultValue="QUALIFIED"><option value="QUALIFIED">Qualified</option><option value="CONDITIONAL">Conditional</option><option value="NOT_QUALIFIED">Not qualified</option></select></label><label>Explicit expiration<input name="expiresAt" type="date" /></label><label>Evidence file UUID<input name="fileId" placeholder="Optional AVAILABLE file UUID" /></label><label>Notes<textarea name="notes" maxLength={2000} /></label>
         {elements.map((element) => <label key={element.id}>{element.code} · {element.title}{element.required ? " *" : ""}<select name={`outcome:${element.id}`} defaultValue="PASS" required><option value="PASS">Pass</option><option value="FAIL">Fail</option>{!element.required && <option value="NOT_APPLICABLE">Not applicable</option>}</select></label>)}
         <button type="submit" disabled={busy || !selectedProgramId || elements.length === 0}>Record competency assessment</button>
