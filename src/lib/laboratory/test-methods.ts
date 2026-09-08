@@ -62,13 +62,15 @@ export class LaboratoryTestMethodService {
     const reason=input.reason.trim();
     if(!reason)throw new LaboratoryTestMethodValidationError("Retirement reason is required");
     return db.$transaction(async tx=>{
-      const table=input.entityType==="test"?"LaboratoryTest":"LaboratoryMethod";
-      const rows=await tx.$queryRaw<Array<{status:string}>>(Prisma.raw(`SELECT status FROM "${table}" WHERE "organizationId"='${input.organizationId}'::uuid AND id='${input.entityId}'::uuid FOR UPDATE`));
-      const current=rows[0];
+      const current=input.entityType==="test"
+        ?(await tx.$queryRaw<Array<{status:string}>>(Prisma.sql`SELECT status FROM "LaboratoryTest" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0]
+        :(await tx.$queryRaw<Array<{status:string}>>(Prisma.sql`SELECT status FROM "LaboratoryMethod" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0];
       if(!current)throw new LaboratoryTestMethodValidationError("Laboratory entity not found");
       if(current.status==="RETIRED")throw new LaboratoryTestMethodValidationError("Laboratory entity is already retired");
-      await tx.$executeRaw(Prisma.raw(`UPDATE "${table}" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"='${input.organizationId}'::uuid AND id='${input.entityId}'::uuid`));
-      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:input.entityType==="test"?"LABORATORY_TEST_RETIRED":"LABORATORY_METHOD_RETIRED",entityType:table,entityId:input.entityId,reason,metadata:{fromStatus:current.status,toStatus:"RETIRED"}}});
+      if(input.entityType==="test")await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryTest" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
+      else await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryMethod" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
+      const entityType=input.entityType==="test"?"LaboratoryTest":"LaboratoryMethod";
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:input.entityType==="test"?"LABORATORY_TEST_RETIRED":"LABORATORY_METHOD_RETIRED",entityType,entityId:input.entityId,reason,metadata:{fromStatus:current.status,toStatus:"RETIRED"}}});
       return{status:"RETIRED" as const};
     });
   }
