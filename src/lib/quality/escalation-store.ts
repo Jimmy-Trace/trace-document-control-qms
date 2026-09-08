@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
-import { escalationLevel } from "./escalation";
+import { escalationLevels } from "./escalation";
 
 type OverdueEvent = {
   id: string;
@@ -25,9 +25,9 @@ export class PrismaQualityEventEscalationStore {
 
     let created = 0;
     for (const event of rows) {
-      const level = escalationLevel(event.overdueDays);
-      if (!level) continue;
-      if (await this.escalate(event, level, now)) created += 1;
+      for (const level of escalationLevels(event.overdueDays)) {
+        if (await this.escalate(event, level, now)) created += 1;
+      }
     }
     return created;
   }
