@@ -17,6 +17,8 @@ export type WorkspaceVisibility = {
   personnelManage: boolean;
   trainingManagement: boolean;
   trainingManage: boolean;
+  qualityEventManagement: boolean;
+  qualityEventManage: boolean;
 };
 
 export function workspaceVisibility(permissionKeys: Iterable<string>): WorkspaceVisibility {
@@ -42,5 +44,7 @@ export function workspaceVisibility(permissionKeys: Iterable<string>): Workspace
     personnelManage: has("personnel.manage"),
     trainingManagement: has("training.read"),
     trainingManage: has("training.manage"),
+    qualityEventManagement: has("quality_event.read"),
+    qualityEventManage: has("quality_event.manage"),
   };
 }
