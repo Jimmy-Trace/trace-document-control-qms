@@ -1,0 +1,10 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest, AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { PrismaQualityClosureStore } from "@/lib/quality/closure-store";
+import { QualityClosureReauthenticationFailedError, QualityClosureReauthenticationThrottledError, QualityClosureService, QualityClosureValidationError } from "@/lib/quality/closure";
+
+const service=new QualityClosureService(new PrismaQualityClosureStore());
+const schema=z.object({closureReason:z.string().max(5000),password:z.string().min(1).max(1024),confirmed:z.literal(true)});
+
+export async function POST(request:NextRequest,{params}:{params:Promise<{eventId:string}>}){try{const context=await authenticateRequest(request);const {eventId}=await params;const input=schema.parse(await request.json());return NextResponse.json({data:await service.close(context,{organizationId:context.organizationId,eventId,...input})});}catch(error){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid closure request"},{status:422});if(error instanceof QualityClosureReauthenticationFailedError)return NextResponse.json({error:error.message},{status:401});if(error instanceof QualityClosureReauthenticationThrottledError)return NextResponse.json({error:error.message},{status:429});if(error instanceof QualityClosureValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Quality event closure failed"},{status:500});}}
