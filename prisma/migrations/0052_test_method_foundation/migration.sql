@@ -49,7 +49,7 @@ CREATE TABLE "LaboratoryMethodVersion" (
   "createdByUserId" uuid NOT NULL,
   "createdAt" timestamptz(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "LaboratoryMethodVersion_method_fkey" FOREIGN KEY ("organizationId","laboratoryMethodId") REFERENCES "LaboratoryMethod"("organizationId","id") ON DELETE RESTRICT,
-  CONSTRAINT "LaboratoryMethodVersion_file_fkey" FOREIGN KEY ("organizationId","procedureFileId") REFERENCES "File"("organizationId","id") ON DELETE RESTRICT,
+  CONSTRAINT "LaboratoryMethodVersion_file_fkey" FOREIGN KEY ("organizationId","procedureFileId") REFERENCES "FileObject"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "LaboratoryMethodVersion_creator_fkey" FOREIGN KEY ("organizationId","createdByUserId") REFERENCES "User"("organizationId","id") ON DELETE RESTRICT,
   CONSTRAINT "LaboratoryMethodVersion_org_method_version_key" UNIQUE ("organizationId","laboratoryMethodId","versionLabel"),
   CONSTRAINT "LaboratoryMethodVersion_version_check" CHECK (length(btrim("versionLabel"))>0),
