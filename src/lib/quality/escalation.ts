@@ -1,6 +1,7 @@
-export function escalationLevel(overdueDays: number): 1 | 2 | 3 | null {
-  if (!Number.isFinite(overdueDays) || overdueDays < 1) return null;
-  if (overdueDays >= 30) return 3;
-  if (overdueDays >= 7) return 2;
-  return 1;
+export function escalationLevels(overdueDays: number): Array<1 | 2 | 3> {
+  if (!Number.isFinite(overdueDays) || overdueDays < 1) return [];
+  const levels: Array<1 | 2 | 3> = [1];
+  if (overdueDays >= 7) levels.push(2);
+  if (overdueDays >= 30) levels.push(3);
+  return levels;
 }
