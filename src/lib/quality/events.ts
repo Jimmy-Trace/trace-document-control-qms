@@ -13,9 +13,15 @@ export type QualityEventRecord = {
   summary:string; description:string|null; discoveredAt:Date; reportedByUserId:string; ownerUserId:string|null; dueAt:Date|null; createdAt:Date; updatedAt:Date;
 };
 
+export type QualityEventLifecycleUpdate = {
+  organizationId:string; eventId:string; reason:string; actorUserId:string;
+  status?:QualityEventStatus; ownerUserId?:string|null; dueAt?:Date|null;
+};
+
 export interface QualityEventStore {
   listEvents(organizationId:string, status?:QualityEventStatus):Promise<QualityEventRecord[]>;
   createEvent(input:{organizationId:string;type:QualityEventType;severity:QualityEventSeverity;source:QualityEventSource;summary:string;description:string|null;discoveredAt:Date;ownerUserId:string|null;dueAt:Date|null;actorUserId:string}):Promise<QualityEventRecord>;
+  updateLifecycle(input:QualityEventLifecycleUpdate):Promise<QualityEventRecord>;
 }
 
 export class QualityEventService {
@@ -36,5 +42,15 @@ export class QualityEventService {
     if(Number.isNaN(input.discoveredAt.getTime())) throw new QualityEventValidationError("Quality event discovery time is invalid");
     if(dueAt&&Number.isNaN(dueAt.getTime())) throw new QualityEventValidationError("Quality event due date is invalid");
     return this.store.createEvent({organizationId:input.organizationId,type:input.type,severity:input.severity,source:input.source??"MANUAL",summary,description,discoveredAt:input.discoveredAt,ownerUserId:input.ownerUserId??null,dueAt,actorUserId:context.userId});
+  }
+
+  updateLifecycle(context:AuthorizationContext,input:{organizationId:string;eventId:string;reason:string;status?:QualityEventStatus;ownerUserId?:string|null;dueAt?:Date|null}) {
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"quality_event.manage"});
+    const reason=input.reason.trim();
+    if(!reason || reason.length>1000) throw new QualityEventValidationError("A lifecycle change reason is required and must not exceed 1000 characters");
+    if(input.status===undefined && input.ownerUserId===undefined && input.dueAt===undefined) throw new QualityEventValidationError("At least one quality event lifecycle change is required");
+    if(input.status==="CLOSED") throw new QualityEventValidationError("Quality event closure requires the controlled closure workflow");
+    if(input.dueAt!==undefined && input.dueAt!==null && Number.isNaN(input.dueAt.getTime())) throw new QualityEventValidationError("Quality event due date is invalid");
+    return this.store.updateLifecycle({...input,reason,actorUserId:context.userId});
   }
 }

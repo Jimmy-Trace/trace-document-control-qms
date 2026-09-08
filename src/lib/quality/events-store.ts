@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
-import { QualityEventValidationError, type QualityEventRecord, type QualityEventStatus, type QualityEventStore } from "./events";
+import { QualityEventValidationError, type QualityEventLifecycleUpdate, type QualityEventRecord, type QualityEventStatus, type QualityEventStore } from "./events";
+
+const nextStatus:Record<Exclude<QualityEventStatus,"CLOSED">,QualityEventStatus|undefined>={OPEN:"INVESTIGATING",INVESTIGATING:"ACTION_REQUIRED",ACTION_REQUIRED:"VERIFICATION",VERIFICATION:undefined};
 
 export class PrismaQualityEventStore implements QualityEventStore {
   listEvents(organizationId:string,status?:QualityEventStatus) {
@@ -26,6 +28,38 @@ export class PrismaQualityEventStore implements QualityEventStore {
       if(!event) throw new QualityEventValidationError("Quality event could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_EVENT_CREATED",entityType:"QualityEvent",entityId:event.id,metadata:{eventNumber:event.eventNumber,type:event.type,severity:event.severity,source:event.source,status:event.status,ownerUserId:event.ownerUserId,dueAt:event.dueAt?.toISOString()??null}}});
       return event;
+    });
+  }
+
+  async updateLifecycle(input:QualityEventLifecycleUpdate) {
+    return db.$transaction(async tx=>{
+      const rows=await tx.$queryRaw<QualityEventRecord[]>(Prisma.sql`SELECT * FROM "QualityEvent" WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.eventId}::uuid FOR UPDATE`);
+      const current=rows[0];
+      if(!current) throw new QualityEventValidationError("Quality event not found");
+      if(current.status==="CLOSED") throw new QualityEventValidationError("Closed quality events cannot be modified");
+      if(input.status!==undefined){
+        const expected=nextStatus[current.status as Exclude<QualityEventStatus,"CLOSED">];
+        if(input.status!==expected) throw new QualityEventValidationError(`Invalid quality event status transition from ${current.status}`);
+      }
+      if(input.ownerUserId!==undefined && input.ownerUserId!==null){
+        const owner=await tx.user.findFirst({where:{organizationId:input.organizationId,id:input.ownerUserId,status:"ACTIVE"},select:{id:true}});
+        if(!owner) throw new Error("Access denied");
+      }
+      const changes:Array<{kind:"STATUS"|"OWNER"|"DUE_DATE";fromValue:string|null;toValue:string|null}>=[];
+      if(input.status!==undefined && input.status!==current.status) changes.push({kind:"STATUS",fromValue:current.status,toValue:input.status});
+      if(input.ownerUserId!==undefined && input.ownerUserId!==current.ownerUserId) changes.push({kind:"OWNER",fromValue:current.ownerUserId,toValue:input.ownerUserId});
+      const currentDue=current.dueAt?.toISOString().slice(0,10)??null;
+      const requestedDue=input.dueAt===undefined?undefined:input.dueAt?.toISOString().slice(0,10)??null;
+      if(requestedDue!==undefined && requestedDue!==currentDue) changes.push({kind:"DUE_DATE",fromValue:currentDue,toValue:requestedDue});
+      if(!changes.length) throw new QualityEventValidationError("Quality event lifecycle update made no changes");
+      const updatedRows=await tx.$queryRaw<QualityEventRecord[]>(Prisma.sql`UPDATE "QualityEvent" SET "status"=COALESCE(${input.status??null}::"QualityEventStatus","status"), "ownerUserId"=CASE WHEN ${input.ownerUserId===undefined} THEN "ownerUserId" ELSE ${input.ownerUserId??null}::uuid END, "dueAt"=CASE WHEN ${input.dueAt===undefined} THEN "dueAt" ELSE ${input.dueAt??null}::date END, "updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.eventId}::uuid RETURNING *`);
+      const updated=updatedRows[0];
+      if(!updated) throw new QualityEventValidationError("Quality event could not be updated");
+      for(const change of changes){
+        await tx.$executeRaw(Prisma.sql`INSERT INTO "QualityEventChange" ("organizationId","eventId","kind","fromValue","toValue","reason","actorUserId") VALUES (${input.organizationId}::uuid,${input.eventId}::uuid,${change.kind}::"QualityEventChangeKind",${change.fromValue},${change.toValue},${input.reason},${input.actorUserId}::uuid)`);
+      }
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_EVENT_LIFECYCLE_UPDATED",entityType:"QualityEvent",entityId:input.eventId,reason:input.reason,metadata:{eventNumber:updated.eventNumber,changes}}});
+      return updated;
     });
   }
 }
