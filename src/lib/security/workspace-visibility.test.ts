@@ -22,6 +22,8 @@ describe("workspace visibility", () => {
       personnelManage: false,
       trainingManagement: false,
       trainingManage: false,
+      qualityEventManagement: false,
+      qualityEventManage: false,
     });
   });
 
@@ -85,5 +87,14 @@ describe("workspace visibility", () => {
     const manageOnly = workspaceVisibility(["personnel.manage"]);
     expect(manageOnly.personnelManagement).toBe(false);
     expect(manageOnly.personnelManage).toBe(true);
+  });
+
+  it("keeps quality-event browsing and mutation independently least-privileged", () => {
+    const reader = workspaceVisibility(["quality_event.read"]);
+    expect(reader.qualityEventManagement).toBe(true);
+    expect(reader.qualityEventManage).toBe(false);
+    const manager = workspaceVisibility(["quality_event.read", "quality_event.manage"]);
+    expect(manager.qualityEventManagement).toBe(true);
+    expect(manager.qualityEventManage).toBe(true);
   });
 });
