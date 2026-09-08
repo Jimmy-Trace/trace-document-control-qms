@@ -7,6 +7,24 @@ CREATE UNIQUE INDEX "EquipmentRecall_system_source_key" ON "EquipmentRecall"("or
 
 ALTER TABLE "EquipmentQuarantineEvent" ALTER COLUMN "actorUserId" DROP NOT NULL;
 
+CREATE TABLE "EquipmentRecallSystemTrigger" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "organizationId" uuid NOT NULL,
+  "equipmentId" uuid NOT NULL,
+  "recallId" uuid NOT NULL,
+  "sourceSystem" text NOT NULL,
+  "sourceKey" text NOT NULL,
+  "payloadHash" text NOT NULL,
+  "createdAt" timestamptz(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "EquipmentRecallSystemTrigger_equipment_fkey" FOREIGN KEY ("organizationId","equipmentId") REFERENCES "Equipment"("organizationId","id") ON DELETE RESTRICT,
+  CONSTRAINT "EquipmentRecallSystemTrigger_recall_fkey" FOREIGN KEY ("recallId") REFERENCES "EquipmentRecall"("id") ON DELETE RESTRICT,
+  CONSTRAINT "EquipmentRecallSystemTrigger_source_check" CHECK (length(btrim("sourceSystem"))>0 AND length(btrim("sourceKey"))>0 AND length("payloadHash")=64),
+  CONSTRAINT "EquipmentRecallSystemTrigger_source_unique" UNIQUE ("organizationId","sourceSystem","sourceKey")
+);
+CREATE INDEX "EquipmentRecallSystemTrigger_org_equipment_idx" ON "EquipmentRecallSystemTrigger"("organizationId","equipmentId","createdAt" DESC);
+CREATE OR REPLACE FUNCTION reject_equipment_recall_trigger_mutation() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'EquipmentRecallSystemTrigger is append-only'; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER "EquipmentRecallSystemTrigger_append_only" BEFORE UPDATE OR DELETE ON "EquipmentRecallSystemTrigger" FOR EACH ROW EXECUTE FUNCTION reject_equipment_recall_trigger_mutation();
+
 CREATE TYPE "EquipmentEscalationSubject" AS ENUM ('COMPLIANCE_HOLD','RECALL');
 CREATE TABLE "EquipmentEscalation" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
