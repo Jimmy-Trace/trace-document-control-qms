@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthorizationContext } from "../security/authorization";
-import { QualityEventService, QualityEventValidationError, type QualityEventStore } from "./events";
+import { QualityEventService, QualityEventValidationError, type QualityEventRecord, type QualityEventStore } from "./events";
 
 const organizationId="00000000-0000-0000-0000-000000000001";
 const userId="00000000-0000-0000-0000-000000000002";
 const context=(permissions:string[]):AuthorizationContext=>({organizationId,userId,userState:"ACTIVE",grants:permissions.map(permission=>({permission,scopeType:"ORGANIZATION" as const,scopeId:null}))});
 const store=():QualityEventStore=>({
   listEvents:vi.fn(async()=>[]),
-  createEvent:vi.fn(async input=>({id:"event-1",organizationId:input.organizationId,eventNumber:"QE-2026-000001",type:input.type,severity:input.severity,source:input.source,status:"OPEN",summary:input.summary,description:input.description,discoveredAt:input.discoveredAt,reportedByUserId:input.actorUserId,ownerUserId:input.ownerUserId,dueAt:input.dueAt,createdAt:new Date(),updatedAt:new Date()})),
+  createEvent:vi.fn(async input: Parameters<QualityEventStore["createEvent"]>[0]): Promise<QualityEventRecord>=>({id:"event-1",organizationId:input.organizationId,eventNumber:"QE-2026-000001",type:input.type,severity:input.severity,source:input.source,status:"OPEN",summary:input.summary,description:input.description,discoveredAt:input.discoveredAt,reportedByUserId:input.actorUserId,ownerUserId:input.ownerUserId,dueAt:input.dueAt,createdAt:new Date(),updatedAt:new Date()})),
 });
 
 describe("QualityEventService",()=>{
