@@ -16,6 +16,7 @@ import { PersonnelCredentialWorkspace } from "@/components/personnel-credential-
 import { PersonnelQualificationWorkspace } from "@/components/personnel-qualification-workspace";
 import { TrainingManagementWorkspace } from "@/components/training-management-workspace";
 import { CompetencyManagementWorkspace } from "@/components/competency-management-workspace";
+import { QualityEventWorkspace } from "@/components/quality-event-workspace";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -82,6 +83,7 @@ export default async function HomePage() {
       {visibility.personnelManagement && <PersonnelQualificationWorkspace canManage={visibility.personnelManage} today={today} />}
       {visibility.trainingManagement && <TrainingManagementWorkspace canManage={visibility.trainingManage} today={today} />}
       {visibility.trainingManagement && <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} />}
+      {visibility.qualityEventManagement && <QualityEventWorkspace canManage={visibility.qualityEventManage} today={today} />}
     </>
   );
 }
