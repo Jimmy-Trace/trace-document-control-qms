@@ -63,12 +63,17 @@ export class LaboratoryTestMethodService {
     if(!reason)throw new LaboratoryTestMethodValidationError("Retirement reason is required");
     return db.$transaction(async tx=>{
       const current=input.entityType==="test"
-        ?(await tx.$queryRaw<Array<{status:string}>>(Prisma.sql`SELECT status FROM "LaboratoryTest" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0]
-        :(await tx.$queryRaw<Array<{status:string}>>(Prisma.sql`SELECT status FROM "LaboratoryMethod" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0];
+        ?(await tx.$queryRaw<Array<{status:"DRAFT"|"ACTIVE"|"RETIRED"}>>(Prisma.sql`SELECT status FROM "LaboratoryTest" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0]
+        :(await tx.$queryRaw<Array<{status:"DRAFT"|"ACTIVE"|"RETIRED"}>>(Prisma.sql`SELECT status FROM "LaboratoryMethod" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid FOR UPDATE`))[0];
       if(!current)throw new LaboratoryTestMethodValidationError("Laboratory entity not found");
       if(current.status==="RETIRED")throw new LaboratoryTestMethodValidationError("Laboratory entity is already retired");
-      if(input.entityType==="test")await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryTest" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
-      else await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryMethod" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
+      if(input.entityType==="test"){
+        await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryTest" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
+        await tx.$executeRaw(Prisma.sql`INSERT INTO "LaboratoryTestStatusChange" ("organizationId","laboratoryTestId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.entityId}::uuid,${current.status}::"LaboratoryTestStatus",'RETIRED',${reason},${context.userId}::uuid)`);
+      }else{
+        await tx.$executeRaw(Prisma.sql`UPDATE "LaboratoryMethod" SET status='RETIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.entityId}::uuid`);
+        await tx.$executeRaw(Prisma.sql`INSERT INTO "LaboratoryMethodStatusChange" ("organizationId","laboratoryMethodId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.entityId}::uuid,${current.status}::"LaboratoryMethodStatus",'RETIRED',${reason},${context.userId}::uuid)`);
+      }
       const entityType=input.entityType==="test"?"LaboratoryTest":"LaboratoryMethod";
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:input.entityType==="test"?"LABORATORY_TEST_RETIRED":"LABORATORY_METHOD_RETIRED",entityType,entityId:input.entityId,reason,metadata:{fromStatus:current.status,toStatus:"RETIRED"}}});
       return{status:"RETIRED" as const};
