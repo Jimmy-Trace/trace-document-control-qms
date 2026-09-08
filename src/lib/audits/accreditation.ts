@@ -2,8 +2,10 @@ import { Prisma } from "@prisma/client";
 import { db } from "../db";
 import type { AuthorizationContext } from "../security/authorization";
 import { requireAuthorization } from "../security/authorization";
+import { QmsNotificationRouter } from "../notifications/qms-router";
 
 export class AuditAccreditationError extends Error {}
+const notificationRouter=new QmsNotificationRouter();
 
 export class AuditAccreditationService {
   async createProgram(context:AuthorizationContext,input:{organizationId:string;programCode:string;name:string;authorityName:string}){
@@ -44,6 +46,7 @@ export class AuditAccreditationService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "Audit" ("organizationId","auditNumber",title,scope,"accreditationProgramId","scheduledStartAt","createdByUserId") VALUES (${input.organizationId}::uuid,${auditNumber},${title},${scope},${input.accreditationProgramId??null}::uuid,${input.scheduledStartAt??null}::timestamptz,${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new AuditAccreditationError("Audit could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"AUDIT_CREATED",entityType:"Audit",entityId:row.id,metadata:{auditNumber,accreditationProgramId:input.accreditationProgramId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"audit.created",eventKey:`audit:${row.id}:created`,payload:{auditId:row.id,auditNumber,scheduledStartAt:input.scheduledStartAt??null}});
       return row;
     });
   }
@@ -62,6 +65,7 @@ export class AuditAccreditationService {
       const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`INSERT INTO "AuditFinding" ("organizationId","auditId","findingNumber",severity,description,"requirementId","createdByUserId") VALUES (${input.organizationId}::uuid,${input.auditId}::uuid,${findingNumber},${input.severity}::"AuditFindingSeverity",${description},${input.requirementId??null}::uuid,${context.userId}::uuid) RETURNING id`))[0];
       if(!row)throw new AuditAccreditationError("Audit finding could not be created");
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"AUDIT_FINDING_CREATED",entityType:"AuditFinding",entityId:row.id,metadata:{auditId:input.auditId,findingNumber,severity:input.severity,requirementId:input.requirementId??null}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"audit.finding.created",eventKey:`audit-finding:${row.id}:created`,payload:{auditId:input.auditId,auditFindingId:row.id,findingNumber,severity:input.severity,requirementId:input.requirementId??null}});
       return row;
     });
   }
@@ -80,6 +84,7 @@ export class AuditAccreditationService {
       await tx.$executeRaw(Prisma.sql`UPDATE "Audit" SET status=${input.toStatus}::"AuditStatus","updatedAt"=CURRENT_TIMESTAMP ${timestamps} WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.auditId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "AuditStatusChange" ("organizationId","auditId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.auditId}::uuid,${current.status}::"AuditStatus",${input.toStatus}::"AuditStatus",${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:`AUDIT_${input.toStatus}`,entityType:"Audit",entityId:input.auditId,reason,metadata:{fromStatus:current.status,toStatus:input.toStatus}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"audit.lifecycle",eventKey:`audit:${input.auditId}:status:${input.toStatus}`,payload:{auditId:input.auditId,fromStatus:current.status,toStatus:input.toStatus}});
       return{status:input.toStatus};
     });
   }
@@ -94,6 +99,7 @@ export class AuditAccreditationService {
       await tx.$executeRaw(Prisma.sql`UPDATE "AuditFinding" SET status=${input.toStatus}::"AuditFindingStatus" ${closed} WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.auditFindingId}::uuid`);
       await tx.$executeRaw(Prisma.sql`INSERT INTO "AuditFindingStatusChange" ("organizationId","auditFindingId","fromStatus","toStatus",reason,"actorUserId") VALUES (${input.organizationId}::uuid,${input.auditFindingId}::uuid,${current.status}::"AuditFindingStatus",${input.toStatus}::"AuditFindingStatus",${reason},${context.userId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:`AUDIT_FINDING_${input.toStatus}`,entityType:"AuditFinding",entityId:input.auditFindingId,reason,metadata:{fromStatus:current.status,toStatus:input.toStatus}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"audit.finding.lifecycle",eventKey:`audit-finding:${input.auditFindingId}:status:${input.toStatus}`,payload:{auditFindingId:input.auditFindingId,fromStatus:current.status,toStatus:input.toStatus}});
       return{status:input.toStatus};
     });
   }
