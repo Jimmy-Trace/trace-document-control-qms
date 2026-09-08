@@ -1,0 +1,10 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { EquipmentService,EquipmentValidationError } from "@/lib/equipment/equipment";
+import { PrismaEquipmentStore } from "@/lib/equipment/equipment-store";
+const service=new EquipmentService(new PrismaEquipmentStore());
+const schema=z.object({eventType:z.enum(["RECEIVED","QUALIFIED","CALIBRATED","MAINTENANCE","SERVICE","OUT_OF_SERVICE","RETURNED_TO_SERVICE","RETIRED"]),occurredAt:z.coerce.date(),summary:z.string().max(5000),evidenceFileId:z.string().uuid().nullish(),performedByUserId:z.string().uuid().nullish()});
+export async function GET(request:NextRequest,{params}:{params:Promise<{equipmentId:string}>}){try{const context=await authenticateRequest(request);const {equipmentId}=await params;return NextResponse.json({data:await service.listEvents(context,context.organizationId,equipmentId)});}catch(error){return respond(error);}}
+export async function POST(request:NextRequest,{params}:{params:Promise<{equipmentId:string}>}){try{const context=await authenticateRequest(request);const {equipmentId}=await params;const input=schema.parse(await request.json());return NextResponse.json({data:await service.addEvent(context,{organizationId:context.organizationId,equipmentId,...input})},{status:201});}catch(error){return respond(error);}}
+function respond(error:unknown){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid equipment event request"},{status:422});if(error instanceof EquipmentValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Equipment event operation failed"},{status:500});}
