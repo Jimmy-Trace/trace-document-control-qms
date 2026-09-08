@@ -62,17 +62,30 @@ CREATE OR REPLACE FUNCTION reject_notification_preference_change_mutation() RETU
 CREATE TRIGGER "NotificationPreferenceChange_append_only" BEFORE UPDATE OR DELETE ON "NotificationPreferenceChange" FOR EACH ROW EXECUTE FUNCTION reject_notification_preference_change_mutation();
 
 CREATE OR REPLACE FUNCTION guard_notification_preference() RETURNS trigger AS $$
-DECLARE policy_criticality "NotificationPolicyCriticality";
+DECLARE policy_criticality "NotificationPolicyCriticality"; required_in_app boolean; required_email boolean;
 BEGIN
-  SELECT criticality INTO policy_criticality FROM "NotificationTopicPolicy"
+  SELECT criticality,"defaultInApp","defaultEmail" INTO policy_criticality,required_in_app,required_email FROM "NotificationTopicPolicy"
   WHERE "organizationId"=NEW."organizationId" AND id=NEW."notificationTopicPolicyId";
   IF policy_criticality IS NULL THEN RAISE EXCEPTION 'Notification topic policy not found'; END IF;
-  IF policy_criticality='MANDATORY' AND (NOT NEW."inAppEnabled" OR NOT NEW."emailEnabled") THEN
-    RAISE EXCEPTION 'Mandatory notification channels cannot be disabled by user preference';
+  IF policy_criticality='MANDATORY' AND ((required_in_app AND NOT NEW."inAppEnabled") OR (required_email AND NOT NEW."emailEnabled")) THEN
+    RAISE EXCEPTION 'Governed mandatory notification channels cannot be disabled by user preference';
   END IF;
   RETURN NEW;
 END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER "NotificationPreference_guard" BEFORE INSERT OR UPDATE ON "NotificationPreference" FOR EACH ROW EXECUTE FUNCTION guard_notification_preference();
+
+CREATE OR REPLACE FUNCTION guard_mandatory_notification_policy_update() RETURNS trigger AS $$
+DECLARE conflicts integer;
+BEGIN
+  IF NEW.criticality='MANDATORY' THEN
+    SELECT count(*) INTO conflicts FROM "NotificationPreference"
+    WHERE "organizationId"=NEW."organizationId" AND "notificationTopicPolicyId"=NEW.id
+      AND ((NEW."defaultInApp" AND NOT "inAppEnabled") OR (NEW."defaultEmail" AND NOT "emailEnabled"));
+    IF conflicts>0 THEN RAISE EXCEPTION 'Mandatory notification policy conflicts with existing user preferences'; END IF;
+  END IF;
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER "NotificationTopicPolicy_mandatory_guard" BEFORE UPDATE OF criticality,"defaultInApp","defaultEmail" ON "NotificationTopicPolicy" FOR EACH ROW EXECUTE FUNCTION guard_mandatory_notification_policy_update();
 
 INSERT INTO "Permission" ("id","key","description") VALUES
   (gen_random_uuid(),'notification.policy.read','View notification topics, delivery policy, and personal preferences'),
