@@ -1,0 +1,10 @@
+import { NextRequest,NextResponse } from "next/server";
+import { z } from "zod";
+import { authenticateRequest,AuthenticationRequiredError } from "@/lib/security/authenticated-request";
+import { InventoryService,InventoryValidationError } from "@/lib/inventory/inventory";
+import { PrismaInventoryStore } from "@/lib/inventory/inventory-store";
+const service=new InventoryService(new PrismaInventoryStore());
+const schema=z.object({lotId:z.string().uuid(),transactionType:z.enum(["ADJUSTMENT_IN","ADJUSTMENT_OUT","CONSUMPTION"]),quantity:z.number().positive(),unitOfMeasure:z.string().max(80),siteId:z.string().uuid().nullish(),departmentId:z.string().uuid().nullish(),reason:z.string().max(2000),referenceKey:z.string().max(240).nullish(),occurredAt:z.coerce.date()});
+export async function GET(request:NextRequest){try{const context=await authenticateRequest(request);const lotId=request.nextUrl.searchParams.get("lotId")||undefined;if(lotId&&!z.string().uuid().safeParse(lotId).success)return NextResponse.json({error:"Invalid lot identifier"},{status:422});return NextResponse.json({data:await service.listBalances(context,context.organizationId,lotId)});}catch(error){return respond(error);}}
+export async function POST(request:NextRequest){try{const context=await authenticateRequest(request);const input=schema.parse(await request.json());return NextResponse.json({data:await service.transact(context,{organizationId:context.organizationId,...input})},{status:201});}catch(error){return respond(error);}}
+function respond(error:unknown){if(error instanceof AuthenticationRequiredError)return NextResponse.json({error:"Authentication required"},{status:401});if(error instanceof z.ZodError)return NextResponse.json({error:"Invalid inventory transaction request"},{status:422});if(error instanceof InventoryValidationError)return NextResponse.json({error:error.message},{status:409});if(error instanceof Error&&error.message==="Access denied")return NextResponse.json({error:"Access denied"},{status:403});return NextResponse.json({error:"Inventory transaction operation failed"},{status:500});}
