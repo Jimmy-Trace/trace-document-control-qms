@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AuthorizationContext } from "../security/authorization";
 import { QualityEventAnalyticsService, type QualityEventAnalyticsStore } from "./analytics";
 
 const organizationId="11111111-1111-4111-8111-111111111111";
 const userId="22222222-2222-4222-8222-222222222222";
-const context=(permissions:string[])=>({organizationId,userId,permissions});
+const context=(permissions:string[]):AuthorizationContext=>({organizationId,userId,userState:"ACTIVE",grants:permissions.map(permission=>({permission,scopeType:"ORGANIZATION" as const,scopeId:null}))});
 const store=():QualityEventAnalyticsStore=>({report:vi.fn().mockResolvedValue({generatedAt:new Date(),windowStart:new Date(),total:0,open:0,overdue:0,closed:0,byStatus:[],byType:[],bySeverity:[],bySource:[],monthly:[]})});
 
 describe("QualityEventAnalyticsService",()=>{
