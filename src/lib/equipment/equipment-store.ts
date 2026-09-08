@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
+import { QmsNotificationRouter } from "../notifications/qms-router";
 import { EquipmentValidationError,type EquipmentEventRecord,type EquipmentRecord,type EquipmentStatus,type EquipmentStore } from "./equipment";
 
 const allowedTransitions:Record<EquipmentStatus,readonly EquipmentStatus[]>={PLANNED:["ACTIVE","RETIRED"],ACTIVE:["OUT_OF_SERVICE","RETIRED"],OUT_OF_SERVICE:["ACTIVE","RETIRED"],RETIRED:[]};
+const notificationRouter=new QmsNotificationRouter();
 
 export class PrismaEquipmentStore implements EquipmentStore{
   list(organizationId:string){return db.$queryRaw<EquipmentRecord[]>(Prisma.sql`SELECT * FROM "Equipment" WHERE "organizationId"=${organizationId}::uuid ORDER BY "equipmentNumber"`);}
@@ -33,7 +35,9 @@ export class PrismaEquipmentStore implements EquipmentStore{
         if(equipment.calibrationRequired&&equipment.calibrationIntervalDays&&!equipment.nextCalibrationDueAt)await tx.$executeRaw(Prisma.sql`UPDATE "Equipment" SET "nextCalibrationDueAt"=(${input.occurredAt}::timestamptz::date + (${equipment.calibrationIntervalDays} * INTERVAL '1 day'))::date,"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.equipmentId}::uuid`);
         if(equipment.maintenanceRequired&&equipment.maintenanceIntervalDays&&!equipment.nextMaintenanceDueAt)await tx.$executeRaw(Prisma.sql`UPDATE "Equipment" SET "nextMaintenanceDueAt"=(${input.occurredAt}::timestamptz::date + (${equipment.maintenanceIntervalDays} * INTERVAL '1 day'))::date,"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.equipmentId}::uuid`);
       }
-      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"EQUIPMENT_EVENT_RECORDED",entityType:"Equipment",entityId:input.equipmentId,metadata:{equipmentNumber:equipment.equipmentNumber,eventId:event.id,eventType:event.eventType,occurredAt:event.occurredAt.toISOString(),evidenceFileId:event.evidenceFileId}}});return event;
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"EQUIPMENT_EVENT_RECORDED",entityType:"Equipment",entityId:input.equipmentId,metadata:{equipmentNumber:equipment.equipmentNumber,eventId:event.id,eventType:event.eventType,occurredAt:event.occurredAt.toISOString(),evidenceFileId:event.evidenceFileId}}});
+      if(["QUALIFIED","CALIBRATED","MAINTENANCE","SERVICE"].includes(event.eventType))await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"equipment.event.recorded",eventKey:`equipment-event:${event.id}:recorded`,payload:{equipmentId:input.equipmentId,equipmentNumber:equipment.equipmentNumber,eventId:event.id,eventType:event.eventType,occurredAt:event.occurredAt.toISOString(),evidenceFileId:event.evidenceFileId}});
+      return event;
     });
   }
   async transition(input:Parameters<EquipmentStore["transition"]>[0]){
@@ -54,6 +58,7 @@ export class PrismaEquipmentStore implements EquipmentStore{
       const eventType=input.status==="OUT_OF_SERVICE"?"OUT_OF_SERVICE":input.status==="RETIRED"?"RETIRED":equipment.status==="OUT_OF_SERVICE"&&input.status==="ACTIVE"?"RETURNED_TO_SERVICE":null;
       if(eventType)await tx.$executeRaw(Prisma.sql`INSERT INTO "EquipmentEvent" ("organizationId","equipmentId","eventType","occurredAt","summary","performedByUserId","createdByUserId") VALUES (${input.organizationId}::uuid,${input.equipmentId}::uuid,${eventType}::"EquipmentEventType",CURRENT_TIMESTAMP,${input.reason},${input.actorUserId}::uuid,${input.actorUserId}::uuid)`);
       await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"EQUIPMENT_STATUS_CHANGED",entityType:"Equipment",entityId:input.equipmentId,reason:input.reason,metadata:{equipmentNumber:equipment.equipmentNumber,fromStatus:equipment.status,toStatus:input.status}}});
+      await notificationRouter.publishConfigured(tx,{organizationId:input.organizationId,topicKey:"equipment.status.changed",eventKey:`equipment:${input.equipmentId}:status:${input.status}`,payload:{equipmentId:input.equipmentId,equipmentNumber:equipment.equipmentNumber,fromStatus:equipment.status,toStatus:input.status,reason:input.reason,eventType}});
       return updated;
     });
   }
