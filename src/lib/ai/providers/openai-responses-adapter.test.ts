@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { aiGovernanceBoundary } from "../ai-governance";
+import type { GovernedAiExecutionPlan } from "../ai-execution-gateway";
 import { createOpenAiResponsesAdapter, OpenAiResponsesAdapterError } from "./openai-responses-adapter";
 
-const plan = {
+const plan: GovernedAiExecutionPlan = {
   correlationId: "11111111-1111-1111-1111-111111111111",
   organizationId: "22222222-2222-2222-2222-222222222222",
-  useCase: "SUMMARIZATION" as const,
+  useCase: "SUMMARIZATION",
   providerProfileId: "33333333-3333-3333-3333-333333333333",
   credentialBindingId: "44444444-4444-4444-4444-444444444444",
   credentialRuntimeSecretName: "AI_PROVIDER_CREDENTIAL_OPENAI",
@@ -16,16 +18,7 @@ const plan = {
   sourceEntityId: null,
   sourceContentEgressApproved: false,
   sourceContentClass: null,
-  governance: {
-    assistiveOnly: true,
-    mayApproveControlledRecords: false,
-    mayCreateElectronicSignatures: false,
-    mayAlterRegulatedHistory: false,
-    mayPerformLifecycleTransitions: false,
-    mayBypassRequiredHumanReview: false,
-    mayMakeComplianceDeterminations: false,
-    mayMutateRegulatedRecords: false,
-  },
+  governance: aiGovernanceBoundary,
 };
 
 describe("OpenAI Responses adapter", () => {
