@@ -1,0 +1,20 @@
+/* Keep desktop content fully clear of the fixed navigation sidebar. */
+.main-column {
+  width: calc(100% - 244px);
+  max-width: calc(100% - 244px);
+}
+
+.workspace-main,
+.content-grid,
+.admin-stack,
+.documents-panel {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .main-column {
+    width: 100%;
+    max-width: 100%;
+  }
+}
