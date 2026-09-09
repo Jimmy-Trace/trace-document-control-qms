@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     const context = await authenticateRequest(request);
     const body = await request.json();
     if (body.operation === "create") return NextResponse.json({ data: await service.create(context, { organizationId: context.organizationId, name: body.name ?? "", scopes: body.scopes }) });
+    if (body.operation === "rotate-credential") return NextResponse.json({ data: await service.rotateCredential(context, { organizationId: context.organizationId, integrationClientId: body.integrationClientId ?? "", reason: body.reason ?? "" }) });
     if (body.operation === "revoke") return NextResponse.json({ data: await service.revoke(context, { organizationId: context.organizationId, integrationClientId: body.integrationClientId ?? "", reason: body.reason ?? "" }) });
     return NextResponse.json({ error: "Unsupported integration client operation" }, { status: 400 });
   } catch (error) {
