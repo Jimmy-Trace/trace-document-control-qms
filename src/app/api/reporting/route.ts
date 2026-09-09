@@ -7,6 +7,8 @@ const service=new ReportingService();
 export async function GET(request:NextRequest){
   try{
     const context=await authenticateRequest(request);
+    const savedViewsFor=request.nextUrl.searchParams.get("savedViewsFor");
+    if(savedViewsFor)return NextResponse.json({data:await service.listSavedViews(context,context.organizationId,savedViewsFor)});
     const reportDefinitionId=request.nextUrl.searchParams.get("reportDefinitionId");
     if(reportDefinitionId)return NextResponse.json({data:await service.listExecutions(context,context.organizationId,reportDefinitionId)});
     return NextResponse.json({data:await service.listDefinitions(context,context.organizationId)});
@@ -24,6 +26,8 @@ export async function POST(request:NextRequest){
     const context=await authenticateRequest(request);
     const body=await request.json();
     if(body.operation==="create-definition")return NextResponse.json({data:await service.createDefinition(context,{...body,organizationId:context.organizationId})});
+    if(body.operation==="save-view")return NextResponse.json({data:await service.saveView(context,{...body,organizationId:context.organizationId})});
+    if(body.operation==="delete-view")return NextResponse.json({data:await service.deleteSavedView(context,{...body,organizationId:context.organizationId})});
     if(body.operation==="execute")return NextResponse.json({data:await service.execute(context,{...body,organizationId:context.organizationId})});
     return NextResponse.json({error:"Unsupported reporting operation"},{status:400});
   }catch(error){
