@@ -1,7 +1,10 @@
 /* Keep desktop content fully clear of the fixed navigation sidebar. */
 .main-column {
-  width: calc(100% - 244px);
-  max-width: calc(100% - 244px);
+  flex: 0 0 calc(100vw - 244px);
+  width: calc(100vw - 244px);
+  max-width: calc(100vw - 244px);
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .workspace-main,
@@ -10,11 +13,27 @@
 .documents-panel {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+}
+
+/* Administration forms should size to their own content rather than stretch
+   to match a taller neighboring form such as the permissions-heavy role form. */
+.admin-stack .template-layout {
+  align-items: start;
+  grid-auto-rows: max-content;
+}
+
+.admin-stack .template-form {
+  align-self: start;
+  height: auto;
+  min-height: 0;
 }
 
 @media (max-width: 760px) {
   .main-column {
+    flex: 1 1 auto;
     width: 100%;
     max-width: 100%;
+    overflow-x: visible;
   }
 }
