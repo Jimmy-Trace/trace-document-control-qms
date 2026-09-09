@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import net from "node:net";
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
@@ -20,6 +21,7 @@ export type IntegrationWebhookSubscription = {
   endpointUrl: string;
   events: IntegrationWebhookEvent[];
   status: "REGISTERED" | "REVOKED";
+  signingKeyVersion: number;
   createdAt: Date;
   revokedAt: Date | null;
 };
@@ -51,11 +53,17 @@ export function validateWebhookEvents(events: unknown): IntegrationWebhookEvent[
   return normalized as IntegrationWebhookEvent[];
 }
 
+export function deriveWebhookSigningSecret(subscriptionId: string, keyVersion = 1, source = process.env) {
+  const master = source.WEBHOOK_SIGNING_MASTER_SECRET?.trim();
+  if (!master || master.length < 32) throw new IntegrationClientError("WEBHOOK_SIGNING_MASTER_SECRET must contain at least 32 characters");
+  return createHmac("sha256", master).update(`${subscriptionId}:v${keyVersion}`).digest("base64url");
+}
+
 export class IntegrationWebhookSubscriptionService {
   async list(context: AuthorizationContext, organizationId: string) {
     requireAuthorization(context,{organizationId,permission:"integration.manage"});
     return db.$queryRaw<IntegrationWebhookSubscription[]>(Prisma.sql`
-      SELECT id,"integrationClientId","endpointUrl",events,status,"createdAt","revokedAt"
+      SELECT id,"integrationClientId","endpointUrl",events,status,"signingKeyVersion","createdAt","revokedAt"
       FROM "IntegrationWebhookSubscription"
       WHERE "organizationId"=${organizationId}::uuid
       ORDER BY "createdAt" DESC,id ASC
@@ -71,14 +79,15 @@ export class IntegrationWebhookSubscriptionService {
         SELECT id FROM "IntegrationClient" WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.integrationClientId}::uuid AND status='ACTIVE'
       `))[0];
       if(!client) throw new IntegrationClientError("Active integration client not found");
-      const row=(await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`
+      const row=(await tx.$queryRaw<Array<{id:string;signingKeyVersion:number}>>(Prisma.sql`
         INSERT INTO "IntegrationWebhookSubscription" ("organizationId","integrationClientId","endpointUrl",events,"createdByUserId")
         VALUES (${input.organizationId}::uuid,${input.integrationClientId}::uuid,${endpointUrl},${events}::text[],${context.userId}::uuid)
-        RETURNING id
+        RETURNING id,"signingKeyVersion"
       `))[0];
       if(!row) throw new IntegrationClientError("Webhook subscription could not be created");
-      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"INTEGRATION_WEBHOOK_SUBSCRIPTION_CREATED",entityType:"IntegrationWebhookSubscription",entityId:row.id,metadata:{integrationClientId:input.integrationClientId,endpointUrl,events}}});
-      return {id:row.id,integrationClientId:input.integrationClientId,endpointUrl,events,status:"REGISTERED" as const};
+      const signingSecret=deriveWebhookSigningSecret(row.id,row.signingKeyVersion);
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"INTEGRATION_WEBHOOK_SUBSCRIPTION_CREATED",entityType:"IntegrationWebhookSubscription",entityId:row.id,metadata:{integrationClientId:input.integrationClientId,endpointUrl,events,signingKeyVersion:row.signingKeyVersion}}});
+      return {id:row.id,integrationClientId:input.integrationClientId,endpointUrl,events,status:"REGISTERED" as const,signingKeyVersion:row.signingKeyVersion,signingSecret};
     });
   }
 
