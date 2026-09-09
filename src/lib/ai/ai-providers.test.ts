@@ -20,6 +20,7 @@ describe("governed AI provider allowlist contract", () => {
     expect(serviceSource).toContain("requireAiUseCaseEnabled");
     expect(serviceSource).toContain("requiresExternalProvider: true");
     expect(serviceSource).toContain("requiresSourceContentEgress: input.requiresSourceContentEgress");
+    expect(serviceSource).toContain("sourceContentClass: input.sourceContentClass");
   });
 
   it("allows only active profiles and explicitly approved models", () => {
