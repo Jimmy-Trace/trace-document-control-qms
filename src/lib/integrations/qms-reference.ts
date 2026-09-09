@@ -14,6 +14,26 @@ export type EffectiveDocumentReference = {
   contentHash: string;
 };
 
+export type EquipmentLifecycleStatus = "PLANNED" | "ACTIVE" | "OUT_OF_SERVICE" | "RETIRED";
+
+export type EquipmentStatusReference = {
+  equipmentId: string;
+  equipmentNumber: string;
+  name: string;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  status: EquipmentLifecycleStatus;
+  siteId: string | null;
+  departmentId: string | null;
+  calibrationRequired: boolean;
+  nextCalibrationDueAt: Date | null;
+  maintenanceRequired: boolean;
+  nextMaintenanceDueAt: Date | null;
+  activeComplianceHoldCount: number;
+  operationallyUsable: boolean;
+};
+
 export function normalizeReferenceLimit(raw: string | null) {
   if (raw === null) return 50;
   const parsed = Number(raw);
@@ -21,6 +41,10 @@ export function normalizeReferenceLimit(raw: string | null) {
     throw new IntegrationClientError("limit must be an integer from 1 to 100");
   }
   return parsed;
+}
+
+export function deriveEquipmentOperationalUsable(status: EquipmentLifecycleStatus, activeComplianceHoldCount: number) {
+  return status === "ACTIVE" && activeComplianceHoldCount === 0;
 }
 
 export async function listEffectiveDocumentReferences(
@@ -74,6 +98,55 @@ export async function listEffectiveDocumentReferences(
     await tx.$executeRaw`
       INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
       VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'effective-documents','READ',${result.length})
+    `;
+
+    return result;
+  });
+}
+
+export async function listEquipmentStatusReferences(
+  context: ExternalIntegrationContext,
+  input?: { limit?: number },
+): Promise<EquipmentStatusReference[]> {
+  requireIntegrationScope(context, "qms.read");
+  const limit = Math.max(1, Math.min(100, input?.limit ?? 50));
+
+  return db.$transaction(async tx => {
+    const rows = await tx.$queryRaw<Array<Omit<EquipmentStatusReference, "operationallyUsable">>>`
+      SELECT
+        e.id AS "equipmentId",
+        e."equipmentNumber",
+        e.name,
+        e.manufacturer,
+        e.model,
+        e."serialNumber",
+        e.status,
+        e."siteId",
+        e."departmentId",
+        e."calibrationRequired",
+        e."nextCalibrationDueAt",
+        e."maintenanceRequired",
+        e."nextMaintenanceDueAt",
+        COUNT(h.id)::int AS "activeComplianceHoldCount"
+      FROM "Equipment" e
+      LEFT JOIN "EquipmentComplianceHold" h
+        ON h."organizationId" = e."organizationId"
+       AND h."equipmentId" = e.id
+       AND h."clearedAt" IS NULL
+      WHERE e."organizationId" = ${context.organizationId}::uuid
+      GROUP BY e.id
+      ORDER BY e."equipmentNumber" ASC, e.id ASC
+      LIMIT ${limit}
+    `;
+
+    const result = rows.map(row => ({
+      ...row,
+      operationallyUsable: deriveEquipmentOperationalUsable(row.status, row.activeComplianceHoldCount),
+    }));
+
+    await tx.$executeRaw`
+      INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
+      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'equipment-status','READ',${result.length})
     `;
 
     return result;
