@@ -34,6 +34,26 @@ export type EquipmentStatusReference = {
   operationallyUsable: boolean;
 };
 
+export type MaterialLotLifecycleStatus = "RECEIVED" | "ACCEPTED" | "QUARANTINED" | "REJECTED" | "EXPIRED" | "RECALLED" | "DEPLETED";
+
+export type MaterialLotStatusReference = {
+  materialId: string;
+  materialNumber: string;
+  materialName: string;
+  manufacturer: string | null;
+  catalogNumber: string | null;
+  materialStatus: "ACTIVE" | "INACTIVE";
+  materialLotId: string;
+  lotNumber: string;
+  status: MaterialLotLifecycleStatus;
+  receivedAt: Date;
+  expirationDate: Date | null;
+  quantityReceived: string | null;
+  unitOfMeasure: string | null;
+  siteId: string | null;
+  departmentId: string | null;
+};
+
 export function normalizeReferenceLimit(raw: string | null) {
   if (raw === null) return 50;
   const parsed = Number(raw);
@@ -150,5 +170,48 @@ export async function listEquipmentStatusReferences(
     `;
 
     return result;
+  });
+}
+
+export async function listMaterialLotStatusReferences(
+  context: ExternalIntegrationContext,
+  input?: { limit?: number },
+): Promise<MaterialLotStatusReference[]> {
+  requireIntegrationScope(context, "qms.read");
+  const limit = Math.max(1, Math.min(100, input?.limit ?? 50));
+
+  return db.$transaction(async tx => {
+    const rows = await tx.$queryRaw<MaterialLotStatusReference[]>`
+      SELECT
+        m.id AS "materialId",
+        m."materialNumber",
+        m.name AS "materialName",
+        m.manufacturer,
+        m."catalogNumber",
+        m.status AS "materialStatus",
+        l.id AS "materialLotId",
+        l."lotNumber",
+        l.status,
+        l."receivedAt",
+        l."expirationDate",
+        l."quantityReceived"::text AS "quantityReceived",
+        l."unitOfMeasure",
+        l."siteId",
+        l."departmentId"
+      FROM "MaterialLot" l
+      JOIN "Material" m
+        ON m."organizationId" = l."organizationId"
+       AND m.id = l."materialId"
+      WHERE l."organizationId" = ${context.organizationId}::uuid
+      ORDER BY m."materialNumber" ASC, l."lotNumber" ASC, l.id ASC
+      LIMIT ${limit}
+    `;
+
+    await tx.$executeRaw`
+      INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
+      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'material-lot-status','READ',${rows.length})
+    `;
+
+    return rows;
   });
 }
