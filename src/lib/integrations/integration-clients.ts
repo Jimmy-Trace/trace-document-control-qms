@@ -34,6 +34,11 @@ function validateScopes(scopes: unknown): IntegrationScope[] {
   return normalized as IntegrationScope[];
 }
 
+function issueSecret() {
+  const secret = randomBytes(32).toString("base64url");
+  return { secret, secretHash: hashSecret(secret) };
+}
+
 export class IntegrationClientService {
   async list(context: AuthorizationContext, organizationId: string) {
     requireAuthorization(context, { organizationId, permission: "integration.manage" });
@@ -48,8 +53,7 @@ export class IntegrationClientService {
     const name = input.name.trim();
     if (!name) throw new IntegrationClientError("Integration client name is required");
     const scopes = validateScopes(input.scopes);
-    const secret = randomBytes(32).toString("base64url");
-    const secretHash = hashSecret(secret);
+    const { secret, secretHash } = issueSecret();
     return db.$transaction(async tx => {
       const row = (await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         INSERT INTO "IntegrationClient" ("organizationId",name,"secretHash",scopes,"createdByUserId")
@@ -66,6 +70,37 @@ export class IntegrationClientService {
         metadata: { name, scopes },
       }});
       return { id: row.id, name, scopes, token: `tqms.${row.id}.${secret}` };
+    });
+  }
+
+  async rotateCredential(context: AuthorizationContext, input: { organizationId: string; integrationClientId: string; reason: string }) {
+    requireAuthorization(context, { organizationId: input.organizationId, permission: "integration.manage" });
+    const reason = input.reason.trim();
+    if (!reason) throw new IntegrationClientError("Credential rotation reason is required");
+    return db.$transaction(async tx => {
+      const existing = (await tx.$queryRaw<Array<{ id: string; name: string }>>(Prisma.sql`
+        SELECT id,name FROM "IntegrationClient"
+        WHERE "organizationId"=${input.organizationId}::uuid AND id=${input.integrationClientId}::uuid AND status='ACTIVE'
+        FOR UPDATE
+      `))[0];
+      if (!existing) throw new IntegrationClientError("Active integration client not found");
+      const { secret, secretHash } = issueSecret();
+      const row = (await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        UPDATE "IntegrationClient" SET "secretHash"=${secretHash},"lastUsedAt"=NULL
+        WHERE "organizationId"=${input.organizationId}::uuid AND id=${existing.id}::uuid AND status='ACTIVE'
+        RETURNING id
+      `))[0];
+      if (!row) throw new IntegrationClientError("Integration client credential could not be rotated");
+      await tx.auditEvent.create({ data: {
+        organizationId: input.organizationId,
+        actorUserId: context.userId,
+        action: "INTEGRATION_CLIENT_CREDENTIAL_ROTATED",
+        entityType: "IntegrationClient",
+        entityId: row.id,
+        reason,
+        metadata: { name: existing.name },
+      }});
+      return { id: row.id, token: `tqms.${row.id}.${secret}` };
     });
   }
 
