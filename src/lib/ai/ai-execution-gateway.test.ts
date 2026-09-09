@@ -11,9 +11,17 @@ describe("governed AI execution gateway contract", () => {
     expect(evidenceWrite).toBeGreaterThan(providerGuard);
   });
 
-  it("passes source-content egress intent into the provider policy guard", () => {
+  it("passes source-content egress intent and classification into the provider policy guard", () => {
     expect(gatewaySource).toContain("requiresSourceContentEgress: input.includesSourceContent");
+    expect(gatewaySource).toContain("sourceContentClass: input.sourceContentClass");
     expect(gatewaySource).toContain("sourceContentEgressApproved: input.includesSourceContent");
+    expect(gatewaySource).toContain("sourceContentClass: input.sourceContentClass ?? null");
+  });
+
+  it("requires classification whenever source content is included", () => {
+    expect(gatewaySource).toContain("input.includesSourceContent && !input.sourceContentClass");
+    expect(gatewaySource).toContain("AI source content classification is required before external egress");
+    expect(gatewaySource).toContain("!input.includesSourceContent && input.sourceContentClass");
   });
 
   it("returns only a governed execution plan and does not call a provider", () => {

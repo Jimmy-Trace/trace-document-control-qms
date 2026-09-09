@@ -7,6 +7,7 @@ import {
   type AiAssistanceUseCase,
 } from "./ai-governance";
 import { requireApprovedAiProvider } from "./ai-providers";
+import type { AiSourceContentClass } from "./ai-policy";
 
 export class AiExecutionGatewayError extends Error {}
 
@@ -21,6 +22,7 @@ export type GovernedAiExecutionPlan = {
   sourceEntityType: string | null;
   sourceEntityId: string | null;
   sourceContentEgressApproved: boolean;
+  sourceContentClass: AiSourceContentClass | null;
   governance: typeof aiGovernanceBoundary;
 };
 
@@ -41,11 +43,18 @@ export async function prepareGovernedAiExecution(
     sourceEntityType?: string;
     sourceEntityId?: string;
     includesSourceContent: boolean;
+    sourceContentClass?: AiSourceContentClass;
   },
 ): Promise<GovernedAiExecutionPlan> {
   const provider = requiredText(input.provider, "AI provider name");
   const model = requiredText(input.model, "AI model name");
   requiredText(input.inputText, "AI assistance input");
+  if (input.includesSourceContent && !input.sourceContentClass) {
+    throw new AiExecutionGatewayError("AI source content classification is required before external egress");
+  }
+  if (!input.includesSourceContent && input.sourceContentClass) {
+    throw new AiExecutionGatewayError("AI source content classification requires source content");
+  }
 
   const profile = await requireApprovedAiProvider(context, {
     organizationId: input.organizationId,
@@ -53,6 +62,7 @@ export async function prepareGovernedAiExecution(
     provider,
     model,
     requiresSourceContentEgress: input.includesSourceContent,
+    sourceContentClass: input.sourceContentClass,
   });
 
   const request = await recordAiAssistanceRequest(context, {
@@ -74,6 +84,7 @@ export async function prepareGovernedAiExecution(
     sourceEntityType: input.sourceEntityType?.trim() || null,
     sourceEntityId: input.sourceEntityId ?? null,
     sourceContentEgressApproved: input.includesSourceContent,
+    sourceContentClass: input.sourceContentClass ?? null,
     governance: aiGovernanceBoundary,
   };
 }
