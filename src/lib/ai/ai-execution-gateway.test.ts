@@ -5,8 +5,8 @@ const gatewaySource = readFileSync(new URL("./ai-execution-gateway.ts", import.m
 
 describe("governed AI execution gateway contract", () => {
   it("requires the approved provider/model guard before creating request evidence", () => {
-    const providerGuard = gatewaySource.indexOf("requireApprovedAiProvider");
-    const evidenceWrite = gatewaySource.indexOf("recordAiAssistanceRequest");
+    const providerGuard = gatewaySource.indexOf("await requireApprovedAiProvider(");
+    const evidenceWrite = gatewaySource.indexOf("await recordAiAssistanceRequest(");
     expect(providerGuard).toBeGreaterThan(-1);
     expect(evidenceWrite).toBeGreaterThan(providerGuard);
   });
