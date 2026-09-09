@@ -84,6 +84,18 @@ export type QualityEventStatusReference = {
   dueAt: Date | null;
 };
 
+export type ValidationProjectReferenceStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
+export type ValidationProjectStatusReference = {
+  validationProjectId: string;
+  projectNumber: string;
+  laboratoryMethodId: string;
+  laboratoryMethodVersionId: string;
+  status: ValidationProjectReferenceStatus;
+  startedAt: Date | null;
+  completedAt: Date | null;
+};
+
 export function normalizeReferenceLimit(raw: string | null) {
   if (raw === null) return 50;
   const parsed = Number(raw);
@@ -273,6 +285,38 @@ export async function listQualityEventStatusReferences(
     await tx.$executeRaw`
       INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
       VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'quality-event-status','READ',${rows.length})
+    `;
+
+    return rows;
+  });
+}
+
+export async function listValidationProjectStatusReferences(
+  context: ExternalIntegrationContext,
+  input?: { limit?: number },
+): Promise<ValidationProjectStatusReference[]> {
+  requireIntegrationScope(context, "qms.read");
+  const limit = Math.max(1, Math.min(100, input?.limit ?? 50));
+
+  return db.$transaction(async tx => {
+    const rows = await tx.$queryRaw<ValidationProjectStatusReference[]>`
+      SELECT
+        v.id AS "validationProjectId",
+        v."projectNumber",
+        v."laboratoryMethodId",
+        v."laboratoryMethodVersionId",
+        v.status,
+        v."startedAt",
+        v."completedAt"
+      FROM "ValidationProject" v
+      WHERE v."organizationId" = ${context.organizationId}::uuid
+      ORDER BY v."createdAt" DESC, v.id ASC
+      LIMIT ${limit}
+    `;
+
+    await tx.$executeRaw`
+      INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
+      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'validation-project-status','READ',${rows.length})
     `;
 
     return rows;
