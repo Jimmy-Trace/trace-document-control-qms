@@ -8,6 +8,11 @@ expected result, actual result, evidence reference, and pass/fail decision for
 every case. A tester must not approve their own authored document where the test
 is intended to demonstrate segregation of duties.
 
+This protocol contains the original critical document-control cases `UAT-01`
+through `UAT-15`. Later critical controls mapped to `UR-014` through `UR-025`
+are covered by `critical-workflow-uat-post-prompt-058.md`. Both protocols are
+required when those later controls are in the candidate scope.
+
 ## Preconditions
 
 - Candidate SHA is deployed from the non-root container artifact.
