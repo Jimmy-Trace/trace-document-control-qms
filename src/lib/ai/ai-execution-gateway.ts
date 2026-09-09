@@ -6,6 +6,7 @@ import {
   type AiAssistanceOutcome,
   type AiAssistanceUseCase,
 } from "./ai-governance";
+import { requireActiveAiProviderCredentialBinding } from "./ai-provider-credentials";
 import { requireApprovedAiProvider } from "./ai-providers";
 import type { AiSourceContentClass } from "./ai-policy";
 
@@ -16,6 +17,9 @@ export type GovernedAiExecutionPlan = {
   organizationId: string;
   useCase: AiAssistanceUseCase;
   providerProfileId: string;
+  credentialBindingId: string;
+  credentialRuntimeSecretName: string;
+  credentialVersion: number;
   provider: string;
   model: string;
   inputSha256: string;
@@ -65,6 +69,12 @@ export async function prepareGovernedAiExecution(
     sourceContentClass: input.sourceContentClass,
   });
 
+  const credentialBinding = await requireActiveAiProviderCredentialBinding(
+    context,
+    input.organizationId,
+    profile.id,
+  );
+
   const request = await recordAiAssistanceRequest(context, {
     organizationId: input.organizationId,
     useCase: input.useCase,
@@ -78,6 +88,9 @@ export async function prepareGovernedAiExecution(
     organizationId: input.organizationId,
     useCase: request.useCase,
     providerProfileId: profile.id,
+    credentialBindingId: credentialBinding.id,
+    credentialRuntimeSecretName: credentialBinding.runtimeSecretName,
+    credentialVersion: credentialBinding.credentialVersion,
     provider,
     model,
     inputSha256: request.inputSha256,
