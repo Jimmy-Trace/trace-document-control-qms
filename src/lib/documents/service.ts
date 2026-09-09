@@ -2,6 +2,7 @@ import {
   requireAuthorization,
   type AuthorizationContext,
 } from "../security/authorization";
+import { queueWebhookEvent } from "../integrations/webhook-delivery";
 import {
   nextDocumentVersionState,
   validateDraftRevision,
@@ -104,10 +105,33 @@ const commandPermissions: Record<DocumentCommand, string> = {
   RETIRE: "document.retire",
 };
 
+type WebhookPublisher = typeof queueWebhookEvent;
+
+export function documentEffectiveWebhookEvent(input: {
+  organizationId: string;
+  documentId: string;
+  versionId: string;
+  occurredAt: Date;
+}): Parameters<WebhookPublisher>[0] {
+  return {
+    organizationId: input.organizationId,
+    eventId: `document.effective:${input.versionId}`,
+    eventName: "document.effective",
+    occurredAt: input.occurredAt,
+    data: {
+      documentId: input.documentId,
+      documentVersionId: input.versionId,
+      status: "EFFECTIVE",
+      effectiveAt: input.occurredAt.toISOString(),
+    },
+  };
+}
+
 export class DocumentCommandService {
   constructor(
     private readonly store: DocumentLifecycleStore,
     private readonly clock: () => Date = () => new Date(),
+    private readonly webhookPublisher: WebhookPublisher = queueWebhookEvent,
   ) {}
 
   async createDraft(
@@ -200,6 +224,7 @@ export class DocumentCommandService {
       input.command,
       input.reason,
     );
+    const occurredAt = this.clock();
     const changed = await this.store.applyTransition({
       organizationId: input.organizationId,
       versionId: version.id,
@@ -217,9 +242,20 @@ export class DocumentCommandService {
       reviewStages,
       workflowTemplateId: input.workflowTemplateId,
       comment: input.comment?.trim() || undefined,
-      occurredAt: this.clock(),
+      occurredAt,
     });
     if (!changed) throw new DocumentConcurrencyError();
+
+    if (input.command === "MAKE_EFFECTIVE") {
+      await this.webhookPublisher(
+        documentEffectiveWebhookEvent({
+          organizationId: input.organizationId,
+          documentId: version.documentId,
+          versionId: version.id,
+          occurredAt,
+        }),
+      );
+    }
 
     return { ...version, status: next, lockVersion: version.lockVersion + 1 };
   }
