@@ -91,6 +91,30 @@ export class IntegrationWebhookSubscriptionService {
     });
   }
 
+  async rotateSigningKey(context: AuthorizationContext,input:{organizationId:string;subscriptionId:string;reason:string}) {
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"integration.manage"});
+    const reason=input.reason.trim();
+    if(!reason) throw new IntegrationClientError("Webhook signing key rotation reason is required");
+    return db.$transaction(async tx=>{
+      const row=(await tx.$queryRaw<Array<{id:string;signingKeyVersion:number}>>(Prisma.sql`
+        UPDATE "IntegrationWebhookSubscription" s
+        SET "signingKeyVersion"="signingKeyVersion"+1
+        FROM "IntegrationClient" c
+        WHERE s."organizationId"=${input.organizationId}::uuid
+          AND s.id=${input.subscriptionId}::uuid
+          AND s.status='REGISTERED'
+          AND c.id=s."integrationClientId"
+          AND c."organizationId"=s."organizationId"
+          AND c.status='ACTIVE'
+        RETURNING s.id,s."signingKeyVersion"
+      `))[0];
+      if(!row) throw new IntegrationClientError("Registered webhook subscription for an active integration client not found");
+      const signingSecret=deriveWebhookSigningSecret(row.id,row.signingKeyVersion);
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:context.userId,action:"INTEGRATION_WEBHOOK_SIGNING_KEY_ROTATED",entityType:"IntegrationWebhookSubscription",entityId:row.id,reason,metadata:{signingKeyVersion:row.signingKeyVersion}}});
+      return {id:row.id,signingKeyVersion:row.signingKeyVersion,signingSecret};
+    });
+  }
+
   async revoke(context: AuthorizationContext,input:{organizationId:string;subscriptionId:string;reason:string}) {
     requireAuthorization(context,{organizationId:input.organizationId,permission:"integration.manage"});
     const reason=input.reason.trim();
