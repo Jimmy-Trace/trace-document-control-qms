@@ -1,0 +1,212 @@
+/* Shared responsive layout stabilization for application workspaces. */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.main-column,
+.workspace-main,
+.panel,
+.panel-header,
+.toolbar,
+.content-grid,
+.admin-stack,
+.template-layout,
+.template-list,
+.template-list article,
+.form-row,
+.detail-body,
+.detail-actions,
+.comparison,
+.comparison-grid {
+  min-width: 0;
+}
+
+.panel {
+  overflow: visible;
+}
+
+.table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+  min-width: 760px;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
+
+.toolbar,
+.panel-header,
+.detail-actions,
+.comparison-head,
+.approval-box > div,
+.review-decisions {
+  flex-wrap: wrap;
+}
+
+.toolbar > *,
+.panel-header > *,
+.detail-actions > *,
+.comparison-head > * {
+  min-width: 0;
+}
+
+.page-heading > div,
+.metric-grid article > div,
+.queue-item,
+.activity > div,
+.user-card > div {
+  min-width: 0;
+}
+
+.page-heading h1,
+.page-heading p,
+.panel-header h2,
+.panel-header p,
+.queue-item > strong,
+.queue-item > span,
+.activity strong,
+.activity p,
+.user-card strong,
+.user-card span {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1200px) {
+  .workspace-main {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .content-grid,
+  .template-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .template-list article {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .template-list article > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar .table-search,
+  .toolbar select,
+  .toolbar button {
+    flex: 1 1 180px;
+  }
+
+  .panel-header {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace-main {
+    padding: 20px 14px 36px;
+  }
+
+  .topbar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .global-search {
+    width: min(300px, 100%);
+  }
+
+  .page-heading,
+  .panel-header,
+  .toolbar,
+  .detail-actions,
+  .comparison-head {
+    align-items: stretch;
+  }
+
+  .page-heading,
+  .panel-header {
+    flex-direction: column;
+  }
+
+  .page-heading .primary-button,
+  .panel-header button,
+  .comparison-head select {
+    width: 100%;
+  }
+
+  .template-list article,
+  .form-row,
+  .comparison-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .template-list article > :last-child {
+    grid-column: auto;
+  }
+
+  .table-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal form,
+  .detail-body,
+  .modal-head {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-main {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .toolbar > *,
+  .toolbar .table-search,
+  .toolbar select,
+  .toolbar button {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .detail-actions > div,
+  .approval-box > div,
+  .review-decisions {
+    width: 100%;
+  }
+
+  .detail-actions button,
+  .approval-box button,
+  .review-decisions button,
+  .review-decisions select {
+    flex: 1 1 100%;
+  }
+}
