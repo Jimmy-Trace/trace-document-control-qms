@@ -14,6 +14,8 @@ export type EffectiveDocumentReference = {
   contentHash: string;
 };
 
+export type EquipmentLifecycleStatus = "PLANNED" | "ACTIVE" | "OUT_OF_SERVICE" | "RETIRED";
+
 export type EquipmentStatusReference = {
   equipmentId: string;
   equipmentNumber: string;
@@ -21,7 +23,7 @@ export type EquipmentStatusReference = {
   manufacturer: string | null;
   model: string | null;
   serialNumber: string | null;
-  status: "PLANNED" | "ACTIVE" | "OUT_OF_SERVICE" | "RETIRED";
+  status: EquipmentLifecycleStatus;
   siteId: string | null;
   departmentId: string | null;
   calibrationRequired: boolean;
@@ -39,6 +41,10 @@ export function normalizeReferenceLimit(raw: string | null) {
     throw new IntegrationClientError("limit must be an integer from 1 to 100");
   }
   return parsed;
+}
+
+export function deriveEquipmentOperationalUsable(status: EquipmentLifecycleStatus, activeComplianceHoldCount: number) {
+  return status === "ACTIVE" && activeComplianceHoldCount === 0;
 }
 
 export async function listEffectiveDocumentReferences(
@@ -106,7 +112,7 @@ export async function listEquipmentStatusReferences(
   const limit = Math.max(1, Math.min(100, input?.limit ?? 50));
 
   return db.$transaction(async tx => {
-    const rows = await tx.$queryRaw<EquipmentStatusReference[]>`
+    const rows = await tx.$queryRaw<Array<Omit<EquipmentStatusReference, "operationallyUsable">>>`
       SELECT
         e.id AS "equipmentId",
         e."equipmentNumber",
@@ -121,8 +127,7 @@ export async function listEquipmentStatusReferences(
         e."nextCalibrationDueAt",
         e."maintenanceRequired",
         e."nextMaintenanceDueAt",
-        COUNT(h.id)::int AS "activeComplianceHoldCount",
-        (e.status = 'ACTIVE' AND COUNT(h.id) = 0) AS "operationallyUsable"
+        COUNT(h.id)::int AS "activeComplianceHoldCount"
       FROM "Equipment" e
       LEFT JOIN "EquipmentComplianceHold" h
         ON h."organizationId" = e."organizationId"
@@ -134,11 +139,16 @@ export async function listEquipmentStatusReferences(
       LIMIT ${limit}
     `;
 
+    const result = rows.map(row => ({
+      ...row,
+      operationallyUsable: deriveEquipmentOperationalUsable(row.status, row.activeComplianceHoldCount),
+    }));
+
     await tx.$executeRaw`
       INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
-      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'equipment-status','READ',${rows.length})
+      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'equipment-status','READ',${result.length})
     `;
 
-    return rows;
+    return result;
   });
 }
