@@ -3,7 +3,7 @@ import { db } from "../db";
 import type { AuthorizationContext } from "../security/authorization";
 import { requireAuthorization } from "../security/authorization";
 import type { AiAssistanceUseCase } from "./ai-governance";
-import { requireAiUseCaseEnabled } from "./ai-policy";
+import { requireAiUseCaseEnabled, type AiSourceContentClass } from "./ai-policy";
 
 export class AiProviderError extends Error {}
 
@@ -124,6 +124,7 @@ export async function requireApprovedAiProvider(
     provider: string;
     model: string;
     requiresSourceContentEgress?: boolean;
+    sourceContentClass?: AiSourceContentClass;
   },
 ) {
   requireAuthorization(context, { organizationId: input.organizationId, permission: "ai.assist" });
@@ -132,6 +133,7 @@ export async function requireApprovedAiProvider(
   await requireAiUseCaseEnabled(context, input.organizationId, input.useCase, {
     requiresExternalProvider: true,
     requiresSourceContentEgress: input.requiresSourceContentEgress,
+    sourceContentClass: input.sourceContentClass,
   });
 
   const profile = (await db.$queryRaw<AiProviderProfileRow[]>(Prisma.sql`
