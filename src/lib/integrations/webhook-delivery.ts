@@ -87,7 +87,8 @@ export async function queueWebhookEvent(input: { organizationId: string; eventId
   if (!approvedWebhookEvents.includes(input.eventName)) throw new IntegrationClientError("Unsupported webhook event");
   const eventId = input.eventId.trim();
   if (!eventId || eventId.length > 200) throw new IntegrationClientError("Webhook event ID must contain 1 to 200 characters");
-  const envelope: WebhookEventEnvelope = { id: eventId, type: input.eventName, createdAt: (input.occurredAt ?? new Date()).toISOString(), data: input.data };
+  const occurredAt = input.occurredAt ?? new Date();
+  const envelope: WebhookEventEnvelope = { id: eventId, type: input.eventName, createdAt: occurredAt.toISOString(), data: input.data };
   const body = payloadText(envelope);
   const payloadHash = createHash("sha256").update(body).digest("hex");
   return db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -95,7 +96,11 @@ export async function queueWebhookEvent(input: { organizationId: string; eventId
     SELECT s."organizationId",s."integrationClientId",s.id,${eventId},${input.eventName},${body}::jsonb,${payloadHash}
     FROM "IntegrationWebhookSubscription" s
     JOIN "IntegrationClient" c ON c.id=s."integrationClientId" AND c."organizationId"=s."organizationId"
-    WHERE s."organizationId"=${input.organizationId}::uuid AND s.status='REGISTERED' AND c.status='ACTIVE' AND s.events @> ARRAY[${input.eventName}]::text[]
+    WHERE s."organizationId"=${input.organizationId}::uuid
+      AND s.status='REGISTERED'
+      AND c.status='ACTIVE'
+      AND s.events @> ARRAY[${input.eventName}]::text[]
+      AND s."createdAt" <= ${occurredAt}
     ON CONFLICT ("subscriptionId","eventId") DO NOTHING
     RETURNING id
   `);
