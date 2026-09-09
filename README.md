@@ -33,12 +33,14 @@ Container hosting, alert ownership, backup exercises, and release approval are
 defined in the [observability and recovery controls](docs/operations/observability-and-recovery.md)
 and [release-candidate checklist](docs/operations/release-candidate-checklist.md).
 
-The current candidate is [`0.1.0-rc.3`](docs/validation/release-candidate-0.1.0-rc.3.md).
+The current candidate is [`0.1.0-rc.4`](docs/validation/release-candidate-0.1.0-rc.4.md).
 Its implemented critical controls are linked to automated and external evidence
-in the [validation traceability matrix](docs/validation/traceability-matrix.md).
+in the [validation traceability matrix](docs/validation/traceability-matrix.md)
+and the [expanded post-Prompt-058 matrix](docs/validation/traceability-matrix-expanded.md).
 
 Validation deployment uses the protected `Validation environment qualification`
-workflow and the [critical-workflow UAT protocol](docs/validation/critical-workflow-uat-protocol.md).
+workflow and the [critical-workflow UAT protocol](docs/validation/critical-workflow-uat-protocol.md),
+including the [post-Prompt-058 UAT extension](docs/validation/critical-workflow-uat-post-prompt-058.md).
 Executed evidence and approvals belong in the controlled validation record, not
 in source control.
 
@@ -67,7 +69,7 @@ external scanner submits an authenticated clean result.
 
 ## Current status
 
-The foundation is intentionally not the complete QMS. Document Control, electronic signatures, records, personnel, training, competency, quality events, CAPA, equipment, validation, PT, audits, inspection readiness, reporting, integrations, and AI are subsequent modules.
+The repository contains the implemented QMS modules through the completed governed assistive-AI scope and is entering a new controlled release-candidate validation cycle. Implementation alone is not a validation or production-approval claim.
 
 ## Regulatory posture
 
