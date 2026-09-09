@@ -1,13 +1,22 @@
 "use client";
-import { useEffect,useState } from "react";
+import { useEffect,useMemo,useState } from "react";
 
-type Definition={id:string;code:string;name:string;sourceKey:string};
+type Definition={id:string;code:string;name:string;sourceKey:"QUALITY_EVENT_SUMMARY"|"EQUIPMENT_SUMMARY"};
 type Execution={id:string;reportCode:string;reportName:string;rowCount:number;executedAt:string};
 type Finalized={id:string;reportExecutionId:string;reportCode:string;reportName:string;rowCount:number;finalizedAt:string};
+type SavedView={id:string;reportDefinitionId:string;name:string;parameters:{status?:string};createdAt:string;updatedAt:string};
+
+const statusOptions:Record<Definition["sourceKey"],readonly string[]>={
+  QUALITY_EVENT_SUMMARY:["OPEN","INVESTIGATING","ACTION_REQUIRED","VERIFICATION","CLOSED"],
+  EQUIPMENT_SUMMARY:["PLANNED","ACTIVE","OUT_OF_SERVICE","RETIRED"],
+};
 
 export function ReportingWorkspace({canManage,canExport}:{canManage:boolean;canExport:boolean}){
-  const [definitions,setDefinitions]=useState<Definition[]>([]),[selected,setSelected]=useState<string>(""),[executions,setExecutions]=useState<Execution[]>([]),[finalized,setFinalized]=useState<Finalized[]>([]),[message,setMessage]=useState("");
+  const [definitions,setDefinitions]=useState<Definition[]>([]),[selected,setSelected]=useState<string>(""),[status,setStatus]=useState(""),[executions,setExecutions]=useState<Execution[]>([]),[finalized,setFinalized]=useState<Finalized[]>([]),[savedViews,setSavedViews]=useState<SavedView[]>([]),[savedViewId,setSavedViewId]=useState(""),[savedViewName,setSavedViewName]=useState(""),[message,setMessage]=useState("");
+  const selectedDefinition=useMemo(()=>definitions.find(definition=>definition.id===selected)??null,[definitions,selected]);
+  const allowedStatuses=selectedDefinition?statusOptions[selectedDefinition.sourceKey]:[];
   const loadExecutions=async(id:string)=>{const r=await fetch(`/api/reporting?reportDefinitionId=${encodeURIComponent(id)}`);if(r.ok)setExecutions((await r.json()).data??[]);};
+  const loadSavedViews=async(id:string)=>{const r=await fetch(`/api/reporting?savedViewsFor=${encodeURIComponent(id)}`);if(r.ok)setSavedViews((await r.json()).data??[]);};
   const loadFinalized=async()=>{const r=await fetch("/api/reporting/finalized");if(r.ok)setFinalized((await r.json()).data??[]);};
   useEffect(()=>{
     let cancelled=false;
@@ -21,13 +30,18 @@ export function ReportingWorkspace({canManage,canExport}:{canManage:boolean;canE
   useEffect(()=>{
     if(!selected)return;
     let cancelled=false;
-    void fetch(`/api/reporting?reportDefinitionId=${encodeURIComponent(selected)}`).then(async response=>{
-      if(response.ok){const data=(await response.json()).data??[];if(!cancelled)setExecutions(data);}
+    void Promise.all([fetch(`/api/reporting?reportDefinitionId=${encodeURIComponent(selected)}`),fetch(`/api/reporting?savedViewsFor=${encodeURIComponent(selected)}`)]).then(async([executionResponse,viewResponse])=>{
+      if(cancelled)return;
+      if(executionResponse.ok){const data=(await executionResponse.json()).data??[];if(!cancelled)setExecutions(data);}
+      if(viewResponse.ok){const data=(await viewResponse.json()).data??[];if(!cancelled)setSavedViews(data);}
     });
     return()=>{cancelled=true;};
   },[selected]);
-  const chooseReport=(id:string)=>{setSelected(id);setExecutions([]);};
-  const execute=async()=>{if(!selected)return;setMessage("");const r=await fetch("/api/reporting",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({operation:"execute",reportDefinitionId:selected,parameters:{}})});setMessage(r.ok?"Report executed.":((await r.json()).error??"Execution failed"));if(r.ok)void loadExecutions(selected);};
+  const chooseReport=(id:string)=>{setSelected(id);setStatus("");setSavedViewId("");setExecutions([]);setSavedViews([]);};
+  const chooseSavedView=(id:string)=>{setSavedViewId(id);const view=savedViews.find(item=>item.id===id);setStatus(view?.parameters.status??"");};
+  const execute=async()=>{if(!selected)return;setMessage("");const body=savedViewId?{operation:"execute",reportDefinitionId:selected,savedViewId}:{operation:"execute",reportDefinitionId:selected,parameters:status?{status}:{}};const r=await fetch("/api/reporting",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});setMessage(r.ok?"Report executed.":((await r.json()).error??"Execution failed"));if(r.ok)void loadExecutions(selected);};
+  const saveView=async()=>{if(!selected||!savedViewName.trim())return;const r=await fetch("/api/reporting",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({operation:"save-view",reportDefinitionId:selected,name:savedViewName.trim(),parameters:status?{status}:{}})});setMessage(r.ok?"Saved personal report view.":((await r.json()).error??"Save failed"));if(r.ok){setSavedViewName("");void loadSavedViews(selected);}};
+  const deleteView=async()=>{if(!savedViewId)return;const r=await fetch("/api/reporting",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({operation:"delete-view",savedViewId})});setMessage(r.ok?"Saved report view deleted.":((await r.json()).error??"Delete failed"));if(r.ok){setSavedViewId("");setStatus("");void loadSavedViews(selected);}};
   const finalize=async(reportExecutionId:string)=>{const r=await fetch("/api/reporting/finalized",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({operation:"finalize-execution",reportExecutionId})});setMessage(r.ok?"Report finalized.":((await r.json()).error??"Finalization failed"));if(r.ok)void loadFinalized();};
-  return <section aria-labelledby="reporting-workspace-title"><h2 id="reporting-workspace-title">Reporting & Analytics</h2><p>Run governed reports, review execution history, and access finalized report exports.</p><label>Report <select value={selected} onChange={e=>chooseReport(e.target.value)}><option value="">Select report</option>{definitions.map(d=><option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}</select></label><button type="button" onClick={execute} disabled={!selected}>Run report</button>{message&&<p role="status">{message}</p>}<h3>Execution history</h3>{executions.length===0?<p>No executions.</p>:<ul>{executions.map(e=><li key={e.id}>{e.reportCode} — {e.rowCount} rows — {new Date(e.executedAt).toLocaleString()} {canManage&&<button type="button" onClick={()=>finalize(e.id)}>Finalize</button>}</li>)}</ul>}<h3>Finalized reports</h3>{finalized.length===0?<p>No finalized reports.</p>:<ul>{finalized.map(f=><li key={f.id}>{f.reportCode} — {f.rowCount} rows — {new Date(f.finalizedAt).toLocaleString()} {canExport&&<a href={`/api/reporting/finalized?finalizedReportId=${encodeURIComponent(f.id)}`}>Export CSV</a>}</li>)}</ul>}</section>;
+  return <section aria-labelledby="reporting-workspace-title"><h2 id="reporting-workspace-title">Reporting & Analytics</h2><p>Run governed reports, apply approved filters, save personal views, review execution history, and access finalized report exports.</p><label>Report <select value={selected} onChange={e=>chooseReport(e.target.value)}><option value="">Select report</option>{definitions.map(d=><option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}</select></label><label>Status filter <select value={status} onChange={e=>{setStatus(e.target.value);setSavedViewId("");}} disabled={!selectedDefinition}><option value="">All approved statuses</option>{allowedStatuses.map(value=><option key={value} value={value}>{value}</option>)}</select></label><label>Personal saved view <select value={savedViewId} onChange={e=>chooseSavedView(e.target.value)} disabled={!selected}><option value="">Use current filter</option>{savedViews.map(view=><option key={view.id} value={view.id}>{view.name}</option>)}</select></label><button type="button" onClick={execute} disabled={!selected}>Run report</button><div><label>Save current filter as <input value={savedViewName} onChange={e=>setSavedViewName(e.target.value)} disabled={!selected}/></label><button type="button" onClick={saveView} disabled={!selected||!savedViewName.trim()}>Save personal view</button><button type="button" onClick={deleteView} disabled={!savedViewId}>Delete selected view</button></div>{message&&<p role="status">{message}</p>}<h3>Execution history</h3>{executions.length===0?<p>No executions.</p>:<ul>{executions.map(e=><li key={e.id}>{e.reportCode} — {e.rowCount} rows — {new Date(e.executedAt).toLocaleString()} {canManage&&<button type="button" onClick={()=>finalize(e.id)}>Finalize</button>}</li>)}</ul>}<h3>Finalized reports</h3>{finalized.length===0?<p>No finalized reports.</p>:<ul>{finalized.map(f=><li key={f.id}>{f.reportCode} — {f.rowCount} rows — {new Date(f.finalizedAt).toLocaleString()} {canExport&&<a href={`/api/reporting/finalized?finalizedReportId=${encodeURIComponent(f.id)}`}>Export CSV</a>}</li>)}</ul>}</section>;
 }
