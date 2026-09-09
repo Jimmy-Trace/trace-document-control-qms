@@ -28,6 +28,11 @@ export async function POST(request: NextRequest) {
       endpointUrl: body.endpointUrl ?? "",
       events: body.events,
     }) });
+    if (body.operation === "rotate_signing_key") return NextResponse.json({ data: await service.rotateSigningKey(context, {
+      organizationId: context.organizationId,
+      subscriptionId: body.subscriptionId ?? "",
+      reason: body.reason ?? "",
+    }) });
     if (body.operation === "revoke") return NextResponse.json({ data: await service.revoke(context, {
       organizationId: context.organizationId,
       subscriptionId: body.subscriptionId ?? "",
