@@ -1,10 +1,26 @@
-/* Keep desktop content fully clear of the fixed navigation sidebar. */
-.main-column {
-  flex: 0 0 calc(100vw - 244px);
-  width: calc(100vw - 244px);
-  max-width: calc(100vw - 244px);
-  min-width: 0;
-  overflow-x: hidden;
+/* Desktop application shell: keep the navigation in normal layout flow so it cannot cover workspace content. */
+@media (min-width: 761px) {
+  .app-shell {
+    align-items: flex-start;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    inset: auto;
+    flex: 0 0 244px;
+    width: 244px;
+    height: 100vh;
+  }
+
+  .main-column {
+    margin-left: 0;
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    overflow-x: clip;
+  }
 }
 
 .workspace-main,
@@ -16,9 +32,10 @@
   min-width: 0;
 }
 
-/* Administration forms should size to their own content rather than stretch
-   to match a taller neighboring form such as the permissions-heavy role form. */
+/* Administration access forms are intentionally one column. The permissions-heavy
+   role form can no longer create an empty grid row beside shorter forms. */
 .admin-stack .template-layout {
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   grid-auto-rows: max-content;
 }
@@ -30,10 +47,19 @@
 }
 
 @media (max-width: 760px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 244px;
+    height: auto;
+  }
+
   .main-column {
+    margin-left: 0;
     flex: 1 1 auto;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     overflow-x: visible;
   }
 }
