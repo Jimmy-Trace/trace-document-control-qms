@@ -4,6 +4,10 @@ This matrix links implemented critical requirements to design and repeatable
 evidence. “Automated pass” means the cited test is executed by CI; it is not a
 claim of regulatory certification.
 
+Requirements `UR-014` and later are maintained in
+[`traceability-matrix-expanded.md`](traceability-matrix-expanded.md) for the
+post-Prompt-058 release-candidate readiness cycle.
+
 | ID | User requirement | Functional/design control | Automated evidence | RC status |
 | --- | --- | --- | --- | --- |
 | UR-001 | Users access only authorized tenant records | Session-derived organization context, RBAC grants, composite tenant keys | `authorization.test.ts`, `tenant-context.test.ts`, database integrity SQL | Automated pass required |
