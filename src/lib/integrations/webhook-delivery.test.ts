@@ -4,7 +4,7 @@ import { deriveWebhookSigningSecret } from "./webhook-subscriptions";
 
 describe("webhook delivery boundary",()=>{
   it("derives deterministic per-subscription secrets without persisting plaintext",()=>{
-    const source={WEBHOOK_SIGNING_MASTER_SECRET:"0123456789abcdef0123456789abcdef"};
+    const source={NODE_ENV:"test",WEBHOOK_SIGNING_MASTER_SECRET:"0123456789abcdef0123456789abcdef"};
     const first=deriveWebhookSigningSecret("11111111-1111-1111-1111-111111111111",1,source);
     const same=deriveWebhookSigningSecret("11111111-1111-1111-1111-111111111111",1,source);
     const other=deriveWebhookSigningSecret("22222222-2222-2222-2222-222222222222",1,source);
@@ -14,7 +14,7 @@ describe("webhook delivery boundary",()=>{
   });
 
   it("requires a sufficiently strong webhook signing master secret",()=>{
-    expect(()=>deriveWebhookSigningSecret("subscription",1,{WEBHOOK_SIGNING_MASTER_SECRET:"short"})).toThrow("at least 32 characters");
+    expect(()=>deriveWebhookSigningSecret("subscription",1,{NODE_ENV:"test",WEBHOOK_SIGNING_MASTER_SECRET:"short"})).toThrow("at least 32 characters");
   });
 
   it("signs the exact delivered body with HMAC-SHA256",()=>{
