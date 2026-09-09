@@ -1,7 +1,7 @@
 ALTER TABLE "IntegrationWebhookSubscription"
   ADD COLUMN "signingKeyVersion" integer NOT NULL DEFAULT 1;
 
-CREATE TYPE "IntegrationWebhookDeliveryStatus" AS ENUM ('PENDING','RETRY','SUCCEEDED','DEAD_LETTER');
+CREATE TYPE "IntegrationWebhookDeliveryStatus" AS ENUM ('PENDING','PROCESSING','RETRY','SUCCEEDED','DEAD_LETTER');
 
 CREATE TABLE "IntegrationWebhookDelivery" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
