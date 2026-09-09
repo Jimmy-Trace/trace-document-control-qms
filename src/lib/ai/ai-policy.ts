@@ -59,7 +59,14 @@ export async function updateAiTenantPolicy(
   }
 
   return db.$transaction(async tx => {
-    const rows = await tx.$queryRaw<Array<{ organizationId: string }>>(Prisma.sql`
+    const rows = await tx.$queryRaw<Array<{
+      organizationId: string;
+      enabled: boolean;
+      enabledUseCases: AiAssistanceUseCase[];
+      allowExternalProvider: boolean;
+      allowSourceContentEgress: boolean;
+      updatedAt: Date;
+    }>>(Prisma.sql`
       INSERT INTO "AiTenantPolicy" (
         "organizationId",enabled,"enabledUseCases","allowExternalProvider","allowSourceContentEgress","updatedByUserId","updatedAt"
       ) VALUES (
@@ -73,9 +80,10 @@ export async function updateAiTenantPolicy(
         "allowSourceContentEgress"=EXCLUDED."allowSourceContentEgress",
         "updatedByUserId"=EXCLUDED."updatedByUserId",
         "updatedAt"=CURRENT_TIMESTAMP
-      RETURNING "organizationId"
+      RETURNING "organizationId",enabled,"enabledUseCases","allowExternalProvider","allowSourceContentEgress","updatedAt"
     `);
-    if (!rows[0]) throw new AiPolicyError("AI tenant policy could not be updated");
+    const policy = rows[0];
+    if (!policy) throw new AiPolicyError("AI tenant policy could not be updated");
 
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "AiTenantPolicyEvent" (
@@ -101,7 +109,7 @@ export async function updateAiTenantPolicy(
       },
     }});
 
-    return getAiTenantPolicy(context, input.organizationId);
+    return policy;
   });
 }
 
