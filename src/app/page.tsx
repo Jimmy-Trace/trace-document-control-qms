@@ -18,6 +18,7 @@ import { TrainingManagementWorkspace } from "@/components/training-management-wo
 import { CompetencyManagementWorkspace } from "@/components/competency-management-workspace";
 import { QualityEventWorkspace } from "@/components/quality-event-workspace";
 import { EquipmentManagementWorkspace } from "@/components/equipment-management-workspace";
+import { ReportingWorkspace } from "@/components/reporting-workspace";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -86,6 +87,7 @@ export default async function HomePage() {
       {visibility.trainingManagement && <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} />}
       {visibility.qualityEventManagement && <QualityEventWorkspace canManage={visibility.qualityEventManage} today={today} />}
       {visibility.equipmentManagement && <EquipmentManagementWorkspace canManage={visibility.equipmentManage} />}
+      {visibility.reportingManagement && <ReportingWorkspace canManage={visibility.reportingManage} canExport={visibility.reportingExport} />}
     </>
   );
 }

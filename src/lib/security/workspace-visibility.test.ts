@@ -26,6 +26,9 @@ describe("workspace visibility", () => {
       qualityEventManage: false,
       equipmentManagement: false,
       equipmentManage: false,
+      reportingManagement: false,
+      reportingManage: false,
+      reportingExport: false,
     });
   });
 
@@ -107,5 +110,20 @@ describe("workspace visibility", () => {
     const manager = workspaceVisibility(["equipment.read", "equipment.manage"]);
     expect(manager.equipmentManagement).toBe(true);
     expect(manager.equipmentManage).toBe(true);
+  });
+
+  it("keeps reporting read, finalization, and export independently least-privileged", () => {
+    const reader = workspaceVisibility(["report.read"]);
+    expect(reader.reportingManagement).toBe(true);
+    expect(reader.reportingManage).toBe(false);
+    expect(reader.reportingExport).toBe(false);
+    const manager = workspaceVisibility(["report.read", "report.manage"]);
+    expect(manager.reportingManagement).toBe(true);
+    expect(manager.reportingManage).toBe(true);
+    expect(manager.reportingExport).toBe(false);
+    const exporter = workspaceVisibility(["report.read", "report.export"]);
+    expect(exporter.reportingManagement).toBe(true);
+    expect(exporter.reportingManage).toBe(false);
+    expect(exporter.reportingExport).toBe(true);
   });
 });
