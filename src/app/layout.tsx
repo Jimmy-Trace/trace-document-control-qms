@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
 import './responsive-stabilization.css';
+import './module-workspaces.css';
 
 export const metadata: Metadata = {
   title: 'Document Control | Trace QMS',
