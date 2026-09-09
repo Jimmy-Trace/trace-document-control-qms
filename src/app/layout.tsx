@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 import './responsive-stabilization.css';
 import './module-workspaces.css';
+import './sidebar-overlap-fix.css';
 
 export const metadata: Metadata = {
   title: 'Document Control | Trace QMS',
