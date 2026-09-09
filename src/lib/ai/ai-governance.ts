@@ -108,6 +108,9 @@ export async function recordAiAssistanceOutcome(
   const outputSha256 = input.outputText ? sha256(input.outputText) : null;
   const provider = input.provider?.trim() || null;
   const model = input.model?.trim() || null;
+  if (input.outcome === "COMPLETED" && (!provider || !model)) {
+    throw new AiGovernanceError("Completed AI assistance requires provider and model provenance");
+  }
 
   await db.$transaction(async tx => {
     const request = (await tx.$queryRaw<Array<{ correlationId: string }>>(Prisma.sql`
