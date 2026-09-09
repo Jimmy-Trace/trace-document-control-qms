@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { signWebhookBody, verifyWebhookSignature } from "./webhook-delivery";
 import { deriveWebhookSigningSecret } from "./webhook-subscriptions";
+
+const deliverySource=readFileSync("src/lib/integrations/webhook-delivery.ts","utf8");
 
 describe("webhook delivery boundary",()=>{
   it("derives deterministic per-subscription secrets without persisting plaintext",()=>{
@@ -25,5 +28,10 @@ describe("webhook delivery boundary",()=>{
     expect(signature).toMatch(/^v1=[0-9a-f]{64}$/);
     expect(verifyWebhookSignature(body,signature,secret)).toBe(true);
     expect(verifyWebhookSignature(`${body} `,signature,secret)).toBe(false);
+  });
+
+  it("does not fan out historical events to subscriptions created later",()=>{
+    expect(deliverySource).toContain('const occurredAt = input.occurredAt ?? new Date()');
+    expect(deliverySource).toContain('AND s."createdAt" <= ${occurredAt}');
   });
 });
