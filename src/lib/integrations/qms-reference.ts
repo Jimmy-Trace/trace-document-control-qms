@@ -54,6 +54,36 @@ export type MaterialLotStatusReference = {
   departmentId: string | null;
 };
 
+export type QualityEventReferenceStatus = "OPEN" | "INVESTIGATING" | "ACTION_REQUIRED" | "VERIFICATION" | "CLOSED";
+export type QualityEventReferenceSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type QualityEventReferenceSource = "MANUAL" | "SYSTEM";
+export type QualityEventReferenceType =
+  | "NONCONFORMANCE"
+  | "PATIENT_COMPLAINT"
+  | "PHYSICIAN_COMPLAINT"
+  | "SPECIMEN_PROBLEM"
+  | "TESTING_ERROR"
+  | "QC_FAILURE"
+  | "PT_FAILURE"
+  | "EQUIPMENT_FAILURE"
+  | "REPORTING_ERROR"
+  | "BILLING_ADMINISTRATIVE"
+  | "SAFETY_EVENT"
+  | "PERSONNEL_EVENT"
+  | "DEVIATION"
+  | "OTHER";
+
+export type QualityEventStatusReference = {
+  qualityEventId: string;
+  eventNumber: string;
+  type: QualityEventReferenceType;
+  severity: QualityEventReferenceSeverity;
+  source: QualityEventReferenceSource;
+  status: QualityEventReferenceStatus;
+  discoveredAt: Date;
+  dueAt: Date | null;
+};
+
 export function normalizeReferenceLimit(raw: string | null) {
   if (raw === null) return 50;
   const parsed = Number(raw);
@@ -210,6 +240,39 @@ export async function listMaterialLotStatusReferences(
     await tx.$executeRaw`
       INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
       VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'material-lot-status','READ',${rows.length})
+    `;
+
+    return rows;
+  });
+}
+
+export async function listQualityEventStatusReferences(
+  context: ExternalIntegrationContext,
+  input?: { limit?: number },
+): Promise<QualityEventStatusReference[]> {
+  requireIntegrationScope(context, "qms.read");
+  const limit = Math.max(1, Math.min(100, input?.limit ?? 50));
+
+  return db.$transaction(async tx => {
+    const rows = await tx.$queryRaw<QualityEventStatusReference[]>`
+      SELECT
+        q.id AS "qualityEventId",
+        q."eventNumber",
+        q.type,
+        q.severity,
+        q.source,
+        q.status,
+        q."discoveredAt",
+        q."dueAt"
+      FROM "QualityEvent" q
+      WHERE q."organizationId" = ${context.organizationId}::uuid
+      ORDER BY q."createdAt" DESC, q.id ASC
+      LIMIT ${limit}
+    `;
+
+    await tx.$executeRaw`
+      INSERT INTO "IntegrationAccessEvent" ("organizationId","integrationClientId",resource,operation,"recordCount")
+      VALUES (${context.organizationId}::uuid,${context.integrationClientId}::uuid,'quality-event-status','READ',${rows.length})
     `;
 
     return rows;
