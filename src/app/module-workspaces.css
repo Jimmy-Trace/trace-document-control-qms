@@ -1,0 +1,254 @@
+.workspace-section {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(16, 35, 63, 0.04);
+}
+
+.workspace-section + .workspace-section {
+  margin-top: 18px;
+}
+
+.section-heading,
+.workspace-heading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-heading > div,
+.workspace-heading > div {
+  min-width: 0;
+}
+
+.section-heading h2,
+.workspace-heading h2 {
+  margin: 0;
+  color: #1b2940;
+  font: 500 18px Georgia, "Times New Roman", serif;
+  line-height: 1.3;
+}
+
+.section-heading p:not(.eyebrow),
+.workspace-heading p:not(.eyebrow) {
+  max-width: 900px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.workspace-section > label {
+  display: grid;
+  gap: 6px;
+  max-width: 520px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.workspace-section input,
+.workspace-section select,
+.workspace-section textarea {
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.workspace-section textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.admin-form {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid #e1e6ee;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.admin-form > label {
+  min-width: 0;
+  grid-column: span 3;
+  display: grid;
+  gap: 6px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-form > label:has(textarea) {
+  grid-column: span 6;
+}
+
+.admin-form > button,
+.workspace-section > button,
+.workspace-section td button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #cfd8e6;
+  border-radius: 6px;
+  background: #fff;
+  color: #315f9e;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-form > button {
+  grid-column: span 3;
+  justify-self: stretch;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.admin-form > button:disabled,
+.workspace-section button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-section [role="status"] {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #bde8d5;
+  border-radius: 7px;
+  background: #edf9f4;
+  color: #176044;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.workspace-section .table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.workspace-section table {
+  min-width: 760px;
+  width: 100%;
+}
+
+.workspace-section th {
+  position: static;
+  white-space: nowrap;
+}
+
+.workspace-section td {
+  max-width: 320px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.workspace-section td:last-child {
+  min-width: 130px;
+}
+
+.workspace-section td:last-child button {
+  margin: 2px 6px 2px 0;
+}
+
+.workspace-section tbody tr:only-child td[colspan] {
+  padding: 28px 16px;
+  color: #8a93a2;
+  text-align: center;
+  white-space: normal;
+}
+
+.workspace-section h3 {
+  margin: 0;
+  color: #27364d;
+  font-size: 12px;
+}
+
+.workspace-section > div:not(.section-heading):not(.workspace-heading):not(.table-wrap) {
+  min-width: 0;
+}
+
+.workspace-section strong,
+.workspace-section span,
+.workspace-section p,
+.workspace-section label,
+.workspace-section th,
+.workspace-section td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .admin-form > label,
+  .admin-form > button {
+    grid-column: span 4;
+  }
+
+  .admin-form > label:has(textarea) {
+    grid-column: span 8;
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace-section {
+    padding: 16px;
+  }
+
+  .admin-form > label,
+  .admin-form > label:has(textarea),
+  .admin-form > button {
+    grid-column: span 6;
+  }
+
+  .section-heading,
+  .workspace-heading {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-section {
+    gap: 14px;
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .admin-form {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .admin-form > label,
+  .admin-form > label:has(textarea),
+  .admin-form > button {
+    grid-column: 1;
+  }
+
+  .workspace-section table {
+    min-width: 680px;
+  }
+
+  .workspace-section > label {
+    max-width: none;
+  }
+}
