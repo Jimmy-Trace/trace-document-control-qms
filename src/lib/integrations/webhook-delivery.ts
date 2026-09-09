@@ -10,6 +10,7 @@ const MAX_PAYLOAD_BYTES = 64 * 1024;
 const MAX_ATTEMPTS = 5;
 const DELIVERY_TIMEOUT_MS = 5_000;
 const RETRY_SECONDS = [60, 300, 1_800, 7_200] as const;
+const OUTBOX_RETRY_SECONDS = [30, 60, 300, 900, 3_600] as const;
 
 export type WebhookEventEnvelope = {
   id: string;
@@ -31,6 +32,16 @@ type DeliveryRow = {
   signingKeyVersion: number;
   subscriptionStatus: "REGISTERED" | "REVOKED";
   clientStatus: "ACTIVE" | "REVOKED";
+};
+
+type OutboxRow = {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  eventName: IntegrationWebhookEvent;
+  data: unknown;
+  occurredAt: Date;
+  attemptCount: number;
 };
 
 function payloadText(payload: unknown) {
@@ -88,6 +99,69 @@ export async function queueWebhookEvent(input: { organizationId: string; eventId
     ON CONFLICT ("subscriptionId","eventId") DO NOTHING
     RETURNING id
   `);
+}
+
+async function claimNextOutbox(): Promise<OutboxRow | null> {
+  return db.$transaction(async tx => {
+    const claimed = (await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      WITH candidate AS (
+        SELECT id FROM "IntegrationWebhookOutbox"
+        WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= CURRENT_TIMESTAMP
+        ORDER BY "nextAttemptAt" ASC,"createdAt" ASC,id ASC
+        FOR UPDATE SKIP LOCKED LIMIT 1
+      )
+      UPDATE "IntegrationWebhookOutbox" o
+      SET "lastAttemptAt"=CURRENT_TIMESTAMP,
+          "attemptCount"="attemptCount"+1,
+          "nextAttemptAt"=CURRENT_TIMESTAMP + INTERVAL '5 minutes'
+      FROM candidate WHERE o.id=candidate.id
+      RETURNING o.id
+    `))[0];
+    if (!claimed) return null;
+    return (await tx.$queryRaw<OutboxRow[]>(Prisma.sql`
+      SELECT id,"organizationId","eventId","eventName",data,"occurredAt","attemptCount"
+      FROM "IntegrationWebhookOutbox"
+      WHERE id=${claimed.id}::uuid
+    `))[0] ?? null;
+  });
+}
+
+async function finishOutboxFailure(row: OutboxRow, message: string) {
+  const delay = OUTBOX_RETRY_SECONDS[Math.min(Math.max(row.attemptCount - 1, 0), OUTBOX_RETRY_SECONDS.length - 1)] ?? OUTBOX_RETRY_SECONDS[OUTBOX_RETRY_SECONDS.length - 1];
+  await db.$executeRaw(Prisma.sql`
+    UPDATE "IntegrationWebhookOutbox"
+    SET "nextAttemptAt"=${new Date(Date.now() + delay * 1000)},"lastError"=${message.slice(0,500)}
+    WHERE id=${row.id}::uuid AND "publishedAt" IS NULL
+  `);
+}
+
+export async function processWebhookOutboxBatch(limit = 10) {
+  const bounded = Math.max(1, Math.min(20, Math.trunc(limit)));
+  const result = { processed: 0, published: 0, retry: 0 };
+  for (let i = 0; i < bounded; i += 1) {
+    const row = await claimNextOutbox();
+    if (!row) break;
+    result.processed += 1;
+    try {
+      await queueWebhookEvent({
+        organizationId: row.organizationId,
+        eventId: row.eventId,
+        eventName: row.eventName,
+        data: row.data,
+        occurredAt: row.occurredAt,
+      });
+      await db.$executeRaw(Prisma.sql`
+        UPDATE "IntegrationWebhookOutbox"
+        SET "publishedAt"=CURRENT_TIMESTAMP,"lastError"=NULL
+        WHERE id=${row.id}::uuid AND "publishedAt" IS NULL
+      `);
+      result.published += 1;
+    } catch (error) {
+      await finishOutboxFailure(row, error instanceof Error ? error.message : "Webhook outbox publication failed");
+      result.retry += 1;
+    }
+  }
+  return result;
 }
 
 async function claimNextDelivery(): Promise<DeliveryRow | null> {
