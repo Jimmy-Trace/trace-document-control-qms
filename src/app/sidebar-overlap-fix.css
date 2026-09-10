@@ -172,10 +172,38 @@
   background: #eef5fb;
 }
 
-.qms-module-nav button span {
+.qms-module-nav button span,
+.qms-subsection-nav button span {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.qms-subsection-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.qms-subsection-nav button {
+  display: grid;
+  gap: 3px;
+  min-width: 170px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f8fafc;
+  font: inherit;
+  cursor: pointer;
+}
+
+.qms-subsection-nav button.active {
+  border-color: #1f4f7a;
+  background: #eef5fb;
 }
 
 .qms-module-content {
@@ -261,13 +289,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .section-nav {
+  .section-nav,
+  .qms-subsection-nav {
     overflow-x: auto;
     flex-wrap: nowrap;
   }
 
   .section-nav button {
     white-space: nowrap;
+  }
+
+  .qms-subsection-nav button {
+    flex: 0 0 210px;
   }
 
   .qms-module-shell {

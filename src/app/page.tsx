@@ -87,13 +87,6 @@ export default async function HomePage() {
     </section>
   ) : null;
 
-  const documentOperations = documentLaunchers || visibility.controlledCopies ? (
-    <>
-      {documentLaunchers}
-      {visibility.controlledCopies && <ControlledCopyAdministration />}
-    </>
-  ) : null;
-
   const accessAdministration = visibility.membershipAdministration ? <MembershipAdministration /> : null;
 
   const records = visibility.recordManagement ? (
@@ -103,21 +96,6 @@ export default async function HomePage() {
       canExport={visibility.recordExport}
       canConfigureTypes={visibility.recordTypeAdministration}
     />
-  ) : null;
-
-  const personnel = visibility.personnelManagement ? (
-    <>
-      <PersonnelManagementWorkspace canManage={visibility.personnelManage} />
-      <PersonnelCredentialWorkspace canManage={visibility.personnelManage} today={today} />
-      <PersonnelQualificationWorkspace canManage={visibility.personnelManage} today={today} />
-    </>
-  ) : null;
-
-  const training = visibility.trainingManagement ? (
-    <>
-      <TrainingManagementWorkspace canManage={visibility.trainingManage} today={today} />
-      <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} />
-    </>
   ) : null;
 
   const quality = visibility.qualityEventManagement ? (
@@ -140,14 +118,99 @@ export default async function HomePage() {
       />
       <QmsModuleShell
         modules={[
-          { id: "documents", label: "Document operations", description: "Submission, lifecycle, acknowledgments, copies, folders, and retention.", content: documentOperations },
-          { id: "administration", label: "Access administration", description: "User memberships and governed access relationships.", content: accessAdministration },
-          { id: "records", label: "Records", description: "Governed regulated-record management.", content: records },
-          { id: "personnel", label: "Personnel", description: "Employees, credentials, and qualifications.", content: personnel },
-          { id: "training", label: "Training & competency", description: "Training assignments and competency evidence.", content: training },
-          { id: "quality", label: "Quality", description: "Quality-event management and trending.", content: quality },
-          { id: "laboratory", label: "Laboratory operations", description: "Equipment and operational controls.", content: laboratory },
-          { id: "reporting", label: "Reporting & analytics", description: "Governed reporting, execution history, and exports.", content: reporting },
+          {
+            id: "documents",
+            label: "Document operations",
+            description: "Submission, lifecycle, acknowledgments, copies, folders, and retention.",
+            sections: [
+              {
+                id: "tools",
+                label: "Document tools",
+                description: "Submission, lifecycle, acknowledgments, folders, and retention actions.",
+                content: documentLaunchers,
+              },
+              {
+                id: "copies",
+                label: "Controlled copies",
+                description: "Issue and reconcile numbered controlled copies.",
+                content: visibility.controlledCopies ? <ControlledCopyAdministration /> : null,
+              },
+            ],
+          },
+          {
+            id: "administration",
+            label: "Access administration",
+            description: "User memberships and governed access relationships.",
+            content: accessAdministration,
+          },
+          {
+            id: "records",
+            label: "Records",
+            description: "Governed regulated-record management.",
+            content: records,
+          },
+          {
+            id: "personnel",
+            label: "Personnel",
+            description: "Employees, credentials, and qualifications.",
+            sections: [
+              {
+                id: "people",
+                label: "People & assignments",
+                description: "Employees, job descriptions, and job assignments.",
+                content: visibility.personnelManagement ? <PersonnelManagementWorkspace canManage={visibility.personnelManage} /> : null,
+              },
+              {
+                id: "credentials",
+                label: "Credentials",
+                description: "Licenses, certifications, registrations, and expiration tracking.",
+                content: visibility.personnelManagement ? <PersonnelCredentialWorkspace canManage={visibility.personnelManage} today={today} /> : null,
+              },
+              {
+                id: "qualifications",
+                label: "Qualifications",
+                description: "Qualification decisions and supporting evidence.",
+                content: visibility.personnelManagement ? <PersonnelQualificationWorkspace canManage={visibility.personnelManage} today={today} /> : null,
+              },
+            ],
+          },
+          {
+            id: "training",
+            label: "Training & competency",
+            description: "Training assignments and competency evidence.",
+            sections: [
+              {
+                id: "training",
+                label: "Training",
+                description: "Courses, assignments, completions, and lifecycle evidence.",
+                content: visibility.trainingManagement ? <TrainingManagementWorkspace canManage={visibility.trainingManage} today={today} /> : null,
+              },
+              {
+                id: "competency",
+                label: "Competency",
+                description: "Programs, assessments, qualification status, and reassessment tracking.",
+                content: visibility.trainingManagement ? <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} /> : null,
+              },
+            ],
+          },
+          {
+            id: "quality",
+            label: "Quality",
+            description: "Quality-event management and trending.",
+            content: quality,
+          },
+          {
+            id: "laboratory",
+            label: "Laboratory operations",
+            description: "Equipment and operational controls.",
+            content: laboratory,
+          },
+          {
+            id: "reporting",
+            label: "Reporting & analytics",
+            description: "Governed reporting, execution history, and exports.",
+            content: reporting,
+          },
         ]}
       />
     </>
