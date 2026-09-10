@@ -40,8 +40,8 @@ export default function LoginPage() {
   return <main className={styles.page}>
     <header className={styles.header}>
       <a className={styles.brand} href="#top" aria-label="Trace QMS home">
-        <span className={styles.brandMark}>T</span>
-        <span className={styles.brandText}><strong>TRACE QMS</strong><span>by Trace Scientific</span></span>
+        <span className={styles.brandMark} aria-hidden="true"><span>T</span><span>Q</span></span>
+        <span className={styles.brandText}><strong>TRACE QMS</strong><span>Quality management by Trace Scientific</span></span>
       </a>
       <nav className={styles.actions} aria-label="Public page actions">
         <a className={styles.linkButton} href="#request-demo">Request a Demo</a>
@@ -62,15 +62,19 @@ export default function LoginPage() {
       </div>
 
       <form className={styles.loginCard} id="login" onSubmit={submit}>
-        <p className={styles.eyebrow}>Secure workspace access</p>
-        <h2>Log in to Trace QMS</h2>
-        <p>Use your assigned organization and account credentials.</p>
-        <label>Organization code<input name="organizationCode" defaultValue="orange-county-labs" autoComplete="organization" required /></label>
-        <label>Email address<input name="email" type="email" autoComplete="username" required /></label>
-        <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+        <div className={styles.loginHeading}>
+          <p className={styles.eyebrow}>Secure workspace access</p>
+          <h2>Log in to Trace QMS</h2>
+          <p>Use your assigned organization and account credentials.</p>
+        </div>
+        <div className={styles.loginFields}>
+          <label><span>Organization code</span><input name="organizationCode" defaultValue="orange-county-labs" autoComplete="organization" required /></label>
+          <label><span>Email address</span><input name="email" type="email" autoComplete="username" required /></label>
+          <label><span>Password</span><input name="password" type="password" autoComplete="current-password" required /></label>
+        </div>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Log in"}</button>
-        <small className={styles.previewNote}>Development preview — synthetic data only.</small>
+        <button type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Log in securely"}</button>
+        <small className={styles.previewNote}>Development preview · Synthetic data only</small>
       </form>
     </section>
 
@@ -88,7 +92,7 @@ export default function LoginPage() {
         <h2>Quality operations in focused, connected modules.</h2>
         <p>Organizations can use the QMS as a unified platform while teams work inside purpose-built governed workspaces for each quality domain.</p>
       </div>
-      <div className={styles.moduleGrid}>{modules.map(([title, description]) => <article className={styles.moduleCard} key={title}><h3>{title}</h3><p>{description}</p></article>)}</div>
+      <div className={styles.moduleGrid}>{modules.map(([title, description], index) => <article className={styles.moduleCard} key={title}><span className={styles.moduleNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{description}</p></article>)}</div>
     </section>
 
     <section className={styles.section} id="request-demo">
@@ -97,12 +101,12 @@ export default function LoginPage() {
           <p className={styles.eyebrow}>See Trace QMS in action</p>
           <h2>Request a guided product demonstration.</h2>
           <p>Explore the document, personnel, training, quality, laboratory operations, records, and reporting workflows with your organization&apos;s use cases in mind.</p>
-          <p className={styles.demoNote}>Demo-request intake is being connected as a separate commercial workflow before launch. No regulated tenant data will be collected through the public marketing page.</p>
+          <p className={styles.demoNote}>Demo-request intake will be connected as a separate commercial workflow before launch. No regulated tenant data is collected through this public preview.</p>
         </div>
         <a className={styles.primaryButton} href="#login">Existing customer? Log In</a>
       </div>
     </section>
 
-    <footer className={styles.footer}><strong>Trace QMS</strong> · Quality management software by Trace Scientific · Development preview</footer>
+    <footer className={styles.footer}><strong>Trace QMS</strong><span>Quality management software by Trace Scientific</span><span>Development preview</span></footer>
   </main>;
 }
