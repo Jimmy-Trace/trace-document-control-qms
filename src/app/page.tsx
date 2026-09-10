@@ -19,6 +19,7 @@ import { CompetencyManagementWorkspace } from "@/components/competency-managemen
 import { QualityEventWorkspace } from "@/components/quality-event-workspace";
 import { EquipmentManagementWorkspace } from "@/components/equipment-management-workspace";
 import { ReportingWorkspace } from "@/components/reporting-workspace";
+import { QmsModuleShell } from "@/components/qms-module-shell";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -56,12 +57,17 @@ export default async function HomePage() {
   );
   const today = new Date().toISOString().slice(0, 10);
 
-  return (
+  const documentOperations = (
+    visibility.controlledSubmission ||
+    visibility.approvalOperations ||
+    visibility.lifecycleOperations ||
+    visibility.acknowledgments ||
+    visibility.acknowledgmentDistribution ||
+    visibility.controlledCopies ||
+    visibility.folderManager ||
+    visibility.retentionAdministration
+  ) ? (
     <>
-      <DashboardVisibilityGate />
-      <DocumentControlDashboard
-        developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
-      />
       {visibility.controlledSubmission && <ControlledSubmission />}
       {visibility.approvalOperations && <ApprovalOperations />}
       {visibility.lifecycleOperations && <LifecycleOperations />}
@@ -69,25 +75,67 @@ export default async function HomePage() {
       {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
       {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
       {visibility.controlledCopies && <ControlledCopyAdministration />}
-      {visibility.membershipAdministration && <MembershipAdministration />}
       {visibility.folderManager && <DocumentFolderManager />}
       {visibility.retentionAdministration && <RetentionAdministration />}
-      {visibility.recordManagement && (
-        <RecordManagementWorkspace
-          canCreate={visibility.recordCreate}
-          canArchive={visibility.recordArchive}
-          canExport={visibility.recordExport}
-          canConfigureTypes={visibility.recordTypeAdministration}
-        />
-      )}
-      {visibility.personnelManagement && <PersonnelManagementWorkspace canManage={visibility.personnelManage} />}
-      {visibility.personnelManagement && <PersonnelCredentialWorkspace canManage={visibility.personnelManage} today={today} />}
-      {visibility.personnelManagement && <PersonnelQualificationWorkspace canManage={visibility.personnelManage} today={today} />}
-      {visibility.trainingManagement && <TrainingManagementWorkspace canManage={visibility.trainingManage} today={today} />}
-      {visibility.trainingManagement && <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} />}
-      {visibility.qualityEventManagement && <QualityEventWorkspace canManage={visibility.qualityEventManage} today={today} />}
-      {visibility.equipmentManagement && <EquipmentManagementWorkspace canManage={visibility.equipmentManage} />}
-      {visibility.reportingManagement && <ReportingWorkspace canManage={visibility.reportingManage} canExport={visibility.reportingExport} />}
+    </>
+  ) : null;
+
+  const accessAdministration = visibility.membershipAdministration ? <MembershipAdministration /> : null;
+
+  const records = visibility.recordManagement ? (
+    <RecordManagementWorkspace
+      canCreate={visibility.recordCreate}
+      canArchive={visibility.recordArchive}
+      canExport={visibility.recordExport}
+      canConfigureTypes={visibility.recordTypeAdministration}
+    />
+  ) : null;
+
+  const personnel = visibility.personnelManagement ? (
+    <>
+      <PersonnelManagementWorkspace canManage={visibility.personnelManage} />
+      <PersonnelCredentialWorkspace canManage={visibility.personnelManage} today={today} />
+      <PersonnelQualificationWorkspace canManage={visibility.personnelManage} today={today} />
+    </>
+  ) : null;
+
+  const training = visibility.trainingManagement ? (
+    <>
+      <TrainingManagementWorkspace canManage={visibility.trainingManage} today={today} />
+      <CompetencyManagementWorkspace canManage={visibility.trainingManage} today={today} />
+    </>
+  ) : null;
+
+  const quality = visibility.qualityEventManagement ? (
+    <QualityEventWorkspace canManage={visibility.qualityEventManage} today={today} />
+  ) : null;
+
+  const laboratory = visibility.equipmentManagement ? (
+    <EquipmentManagementWorkspace canManage={visibility.equipmentManage} />
+  ) : null;
+
+  const reporting = visibility.reportingManagement ? (
+    <ReportingWorkspace canManage={visibility.reportingManage} canExport={visibility.reportingExport} />
+  ) : null;
+
+  return (
+    <>
+      <DashboardVisibilityGate />
+      <DocumentControlDashboard
+        developmentPreview={process.env.DEPLOYMENT_TIER === "development-preview"}
+      />
+      <QmsModuleShell
+        modules={[
+          { id: "documents", label: "Document operations", description: "Submission, lifecycle, acknowledgments, copies, folders, and retention.", content: documentOperations },
+          { id: "administration", label: "Access administration", description: "User memberships and governed access relationships.", content: accessAdministration },
+          { id: "records", label: "Records", description: "Governed regulated-record management.", content: records },
+          { id: "personnel", label: "Personnel", description: "Employees, credentials, and qualifications.", content: personnel },
+          { id: "training", label: "Training & competency", description: "Training assignments and competency evidence.", content: training },
+          { id: "quality", label: "Quality", description: "Quality-event management and trending.", content: quality },
+          { id: "laboratory", label: "Laboratory operations", description: "Equipment and operational controls.", content: laboratory },
+          { id: "reporting", label: "Reporting & analytics", description: "Governed reporting, execution history, and exports.", content: reporting },
+        ]}
+      />
     </>
   );
 }
