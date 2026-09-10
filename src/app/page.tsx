@@ -7,7 +7,6 @@ import { MyAcknowledgments } from "@/components/my-acknowledgments";
 import { AcknowledgmentDistribution } from "@/components/acknowledgment-distribution";
 import { OrganizationalAcknowledgmentDistribution } from "@/components/organizational-acknowledgment-distribution";
 import { ControlledCopyAdministration } from "@/components/controlled-copy-administration";
-import { MembershipAdministration } from "@/components/membership-administration";
 import { DocumentFolderManager } from "@/components/document-folder-manager";
 import { RetentionAdministration } from "@/components/retention-administration";
 import { RecordManagementWorkspace } from "@/components/record-management-workspace";
@@ -100,8 +99,6 @@ export default async function HomePage() {
     </section>
   ) : null;
 
-  const accessAdministration = visibility.membershipAdministration ? <MembershipAdministration /> : null;
-
   const records = visibility.recordManagement ? (
     <RecordManagementWorkspace
       canCreate={visibility.recordCreate}
@@ -155,12 +152,6 @@ export default async function HomePage() {
             label: "Review management",
             description: "Approval assignments and governed review actions.",
             content: reviewManagement,
-          },
-          {
-            id: "administration",
-            label: "Access administration",
-            description: "User memberships and governed access relationships.",
-            content: accessAdministration,
           },
           {
             id: "records",
