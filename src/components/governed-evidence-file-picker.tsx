@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import styles from "./governed-evidence-file-picker.module.css";
 
 type EvidenceFile = { id: string; originalName: string; mimeType: string; sizeBytes: string; sha256: string; status: string };
 const ACCEPTED = ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tif,.tiff,.txt,.csv";
@@ -43,11 +44,11 @@ export function GovernedEvidenceFilePicker({ name = "fileId", disabled = false }
   const pending = files.filter((file) => file.status === "PENDING_SCAN");
   const selectedFile = useMemo(() => available.find((file) => file.id === selected) ?? null, [available, selected]);
 
-  return <fieldset className="evidence-file-picker" disabled={disabled}>
+  return <fieldset className={styles.panel} disabled={disabled}>
     <legend>Supporting evidence</legend>
-    <p className="evidence-file-picker__intro">Attach an existing approved file or upload a new supporting document.</p>
+    <p className={styles.intro}>Attach an existing approved file or upload a new supporting document.</p>
 
-    <label className="evidence-file-picker__field">
+    <label className={styles.field}>
       <span>Select existing file</span>
       <select name={name} value={selected} onChange={(event) => setSelected(event.target.value)} disabled={disabled}>
         <option value="">No evidence file attached</option>
@@ -55,12 +56,12 @@ export function GovernedEvidenceFilePicker({ name = "fileId", disabled = false }
       </select>
     </label>
 
-    {selectedFile && <div className="evidence-file-picker__selected" aria-live="polite">
+    {selectedFile && <div className={styles.selected} aria-live="polite">
       <strong>{selectedFile.originalName}</strong>
       <span>Available · SHA-256 {selectedFile.sha256.slice(0, 12)}…</span>
     </div>}
 
-    <div className="evidence-file-picker__upload">
+    <div className={styles.upload}>
       <label>
         <span>Upload new file</span>
         <input type="file" accept={ACCEPTED} onChange={(event) => void upload(event)} disabled={disabled || uploading} />
@@ -68,7 +69,7 @@ export function GovernedEvidenceFilePicker({ name = "fileId", disabled = false }
       <small>PDF, Word, Excel, JPEG, PNG, TIFF, TXT or CSV · Max 25 MB · New files are malware scanned before use.</small>
     </div>
 
-    {pending.length > 0 && <p className="evidence-file-picker__pending">{pending.length} evidence file{pending.length === 1 ? " is" : "s are"} awaiting malware scan.</p>}
-    {notice && <p className="evidence-file-picker__notice" role="status">{notice}</p>}
+    {pending.length > 0 && <p className={styles.pending}>{pending.length} evidence file{pending.length === 1 ? " is" : "s are"} awaiting malware scan.</p>}
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
   </fieldset>;
 }
