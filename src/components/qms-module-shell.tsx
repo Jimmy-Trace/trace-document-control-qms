@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-type ModuleId = "documents" | "records" | "personnel" | "training" | "quality" | "laboratory" | "reporting";
+type ModuleId = "documents" | "administration" | "records" | "personnel" | "training" | "quality" | "laboratory" | "reporting";
 
 type ModuleDefinition = {
   id: ModuleId;
