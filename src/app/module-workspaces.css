@@ -120,6 +120,22 @@
   color: #fff;
 }
 
+.qms-module-content > .panel .admin-form > button[type="submit"] {
+  display: inline-flex;
+  visibility: visible;
+  grid-column: 1 / -1;
+  min-height: 44px;
+  margin-top: 4px;
+  align-items: center;
+  justify-content: center;
+  justify-self: stretch;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .admin-form > button:disabled,
 .workspace-section button:disabled {
   opacity: 0.5;
