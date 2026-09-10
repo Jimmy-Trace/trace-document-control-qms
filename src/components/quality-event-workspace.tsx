@@ -35,7 +35,23 @@ export function QualityEventWorkspace({canManage,today}:{canManage:boolean;today
     if(analyticsResponse.ok)setAnalytics(analyticsBody?.data??null);
   }
 
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    let active=true;
+    Promise.all([
+      fetch("/api/quality/events",{credentials:"same-origin"}),
+      fetch("/api/quality/events/analytics?months=12",{credentials:"same-origin"}),
+    ]).then(async([eventsResponse,analyticsResponse])=>({
+      eventsResponse,
+      analyticsResponse,
+      eventsBody:await eventsResponse.json().catch(()=>null),
+      analyticsBody:await analyticsResponse.json().catch(()=>null),
+    })).then(({eventsResponse,analyticsResponse,eventsBody,analyticsBody})=>{
+      if(!active)return;
+      if(eventsResponse.ok)setEvents(eventsBody?.data??[]);else setError(eventsBody?.error??"Unable to load quality events");
+      if(analyticsResponse.ok)setAnalytics(analyticsBody?.data??null);
+    });
+    return()=>{active=false;};
+  },[]);
   const selected=useMemo(()=>events.find(event=>event.id===selectedId)??null,[events,selectedId]);
   const overdue=(event:EventRecord)=>event.status!=="CLOSED"&&!!event.dueAt&&event.dueAt.slice(0,10)<today;
 
