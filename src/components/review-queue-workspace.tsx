@@ -10,8 +10,11 @@ type Section = "periodic" | "overdue" | "assignments";
 function date(value: string) { return new Date(value).toLocaleString(); }
 
 export function ReviewQueueWorkspace({ active }: { active: boolean }) {
-  const [section, setSection] = useState<Section>("periodic"), [data, setData] = useState<DashboardPayload | null>(null), [error, setError] = useState("");
-  const target = typeof document === "undefined" ? null : document.querySelector(".workspace-main");
+  const [section, setSection] = useState<Section>("periodic"), [data, setData] = useState<DashboardPayload | null>(null), [error, setError] = useState(""), [target, setTarget] = useState<Element | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setTarget(document.querySelector(".workspace-main")), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => { if (!active || data) return; let mounted = true; fetch("/api/workspace/dashboard", { credentials: "same-origin" }).then(async (response) => ({ response, body: await response.json().catch(() => null) })).then(({ response, body }) => { if (!mounted) return; if (response.ok && body?.data) setData(body.data as DashboardPayload); else setError(body?.error || "Review queue could not be loaded."); }).catch(() => { if (mounted) setError("Review queue could not be loaded."); }); return () => { mounted = false; }; }, [active, data]);
   const overdue = useMemo(() => data?.reviews.filter((review) => review.overdue) ?? [], [data]);
   if (!active || !target) return null;
