@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { GovernedEvidenceFilePicker } from "@/components/governed-evidence-file-picker";
 
 type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; status: "ACTIVE" | "INACTIVE" | "TERMINATED" };
 type Qualification = { id: string; employeeId: string; qualificationType: string; qualificationScope: string | null; qualifiedAt: string; expiresAt: string | null; fileId: string | null; createdAt: string };
@@ -73,7 +74,7 @@ export function PersonnelQualificationWorkspace({ canManage, today }: { canManag
       <label>Qualification scope<textarea name="qualificationScope" maxLength={500} /></label>
       <label>Qualified date<input name="qualifiedAt" type="date" required /></label>
       <label>Expiration date<input name="expiresAt" type="date" /></label>
-      <label>Evidence file UUID<input name="fileId" placeholder="Optional AVAILABLE file UUID" /></label>
+      <GovernedEvidenceFilePicker disabled={busy} />
       <button type="submit" disabled={busy}>Record qualification</button>
     </form>}
     {notice && <p role="status">{notice}</p>}
