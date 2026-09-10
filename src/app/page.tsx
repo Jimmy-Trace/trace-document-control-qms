@@ -57,26 +57,40 @@ export default async function HomePage() {
   );
   const today = new Date().toISOString().slice(0, 10);
 
-  const documentOperations = (
+  const documentLaunchers = (
     visibility.controlledSubmission ||
     visibility.approvalOperations ||
     visibility.lifecycleOperations ||
     visibility.acknowledgments ||
     visibility.acknowledgmentDistribution ||
-    visibility.controlledCopies ||
     visibility.folderManager ||
     visibility.retentionAdministration
   ) ? (
+    <section className="document-operation-launcher-panel" aria-labelledby="document-operation-launcher-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">DOCUMENT OPERATIONS</p>
+          <h3 id="document-operation-launcher-heading">Document tools</h3>
+          <p>Open a focused governed task without leaving the document workspace.</p>
+        </div>
+      </div>
+      <div className="document-operation-launchers">
+        {visibility.controlledSubmission && <ControlledSubmission />}
+        {visibility.approvalOperations && <ApprovalOperations />}
+        {visibility.lifecycleOperations && <LifecycleOperations />}
+        {visibility.acknowledgments && <MyAcknowledgments />}
+        {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
+        {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
+        {visibility.folderManager && <DocumentFolderManager />}
+        {visibility.retentionAdministration && <RetentionAdministration />}
+      </div>
+    </section>
+  ) : null;
+
+  const documentOperations = documentLaunchers || visibility.controlledCopies ? (
     <>
-      {visibility.controlledSubmission && <ControlledSubmission />}
-      {visibility.approvalOperations && <ApprovalOperations />}
-      {visibility.lifecycleOperations && <LifecycleOperations />}
-      {visibility.acknowledgments && <MyAcknowledgments />}
-      {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
-      {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
+      {documentLaunchers}
       {visibility.controlledCopies && <ControlledCopyAdministration />}
-      {visibility.folderManager && <DocumentFolderManager />}
-      {visibility.retentionAdministration && <RetentionAdministration />}
     </>
   ) : null;
 
