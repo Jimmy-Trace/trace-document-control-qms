@@ -59,7 +59,6 @@ export default async function HomePage() {
 
   const documentLaunchers = (
     visibility.controlledSubmission ||
-    visibility.approvalOperations ||
     visibility.lifecycleOperations ||
     visibility.acknowledgments ||
     visibility.acknowledgmentDistribution ||
@@ -76,13 +75,27 @@ export default async function HomePage() {
       </div>
       <div className="document-operation-launchers">
         {visibility.controlledSubmission && <ControlledSubmission />}
-        {visibility.approvalOperations && <ApprovalOperations />}
         {visibility.lifecycleOperations && <LifecycleOperations />}
         {visibility.acknowledgments && <MyAcknowledgments />}
         {visibility.acknowledgmentDistribution && <AcknowledgmentDistribution />}
         {visibility.acknowledgmentDistribution && <OrganizationalAcknowledgmentDistribution />}
         {visibility.folderManager && <DocumentFolderManager />}
         {visibility.retentionAdministration && <RetentionAdministration />}
+      </div>
+    </section>
+  ) : null;
+
+  const reviewManagement = visibility.approvalOperations ? (
+    <section className="document-operation-launcher-panel" aria-labelledby="review-management-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">REVIEW MANAGEMENT</p>
+          <h3 id="review-management-heading">Review tools</h3>
+          <p>Manage approval assignments from the review domain instead of the document-operations workspace.</p>
+        </div>
+      </div>
+      <div className="document-operation-launchers">
+        <ApprovalOperations />
       </div>
     </section>
   ) : null;
@@ -136,6 +149,12 @@ export default async function HomePage() {
                 content: visibility.controlledCopies ? <ControlledCopyAdministration /> : null,
               },
             ],
+          },
+          {
+            id: "reviews",
+            label: "Review management",
+            description: "Approval assignments and governed review actions.",
+            content: reviewManagement,
           },
           {
             id: "administration",
