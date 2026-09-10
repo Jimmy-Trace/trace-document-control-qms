@@ -20,10 +20,18 @@ const allowedTypes = new Set([
 ]);
 const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 180) || "evidence";
 
+type EvidenceDomain = "personnel" | "training";
+function getDomain(request: NextRequest): EvidenceDomain {
+  return request.nextUrl.searchParams.get("domain") === "training" ? "training" : "personnel";
+}
+function readPermission(domain: EvidenceDomain) { return domain === "training" ? "training.read" : "personnel.read"; }
+function managePermission(domain: EvidenceDomain) { return domain === "training" ? "training.manage" : "personnel.manage"; }
+
 export async function GET(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
-    requireAuthorization(context, { organizationId: context.organizationId, permission: "personnel.read" });
+    const domain = getDomain(request);
+    requireAuthorization(context, { organizationId: context.organizationId, permission: readPermission(domain) });
     const rows = await db.fileObject.findMany({
       where: { organizationId: context.organizationId },
       select: { id: true, originalName: true, mimeType: true, sizeBytes: true, sha256: true, status: true, createdAt: true },
@@ -40,7 +48,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await authenticateRequest(request);
-    requireAuthorization(context, { organizationId: context.organizationId, permission: "personnel.manage" });
+    const domain = getDomain(request);
+    requireAuthorization(context, { organizationId: context.organizationId, permission: managePermission(domain) });
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File) || file.size < 1 || file.size > MAX_BYTES || !allowedTypes.has(file.type)) {
@@ -73,7 +82,7 @@ export async function POST(request: NextRequest) {
           entityType: "FileObject",
           entityId: row.id,
           newHash: hash,
-          metadata: { originalName: row.originalName, sizeBytes: file.size, mimeType: file.type, evidenceDomain: "PERSONNEL" },
+          metadata: { originalName: row.originalName, sizeBytes: file.size, mimeType: file.type, evidenceDomain: domain.toUpperCase() },
         },
       });
     } catch {
