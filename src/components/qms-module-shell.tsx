@@ -1,0 +1,49 @@
+"use client";
+
+import { useMemo, useState, type ReactNode } from "react";
+
+type ModuleId = "documents" | "records" | "personnel" | "training" | "quality" | "laboratory" | "reporting";
+
+type ModuleDefinition = {
+  id: ModuleId;
+  label: string;
+  description: string;
+  content: ReactNode;
+};
+
+export function QmsModuleShell({ modules }: { modules: ModuleDefinition[] }) {
+  const visibleModules = useMemo(() => modules.filter((module) => module.content), [modules]);
+  const [activeModule, setActiveModule] = useState<ModuleId>(visibleModules[0]?.id ?? "documents");
+  const active = visibleModules.find((module) => module.id === activeModule) ?? visibleModules[0];
+
+  if (!active) return null;
+
+  return (
+    <section className="qms-module-shell" aria-labelledby="qms-module-shell-heading">
+      <div className="qms-module-shell-header">
+        <div>
+          <p className="eyebrow">QMS MODULES</p>
+          <h2 id="qms-module-shell-heading">Operational workspaces</h2>
+          <p>Open one governed domain at a time instead of rendering every permitted workspace in one continuous page.</p>
+        </div>
+      </div>
+      <nav className="qms-module-nav" aria-label="QMS modules">
+        {visibleModules.map((module) => (
+          <button
+            type="button"
+            key={module.id}
+            className={active.id === module.id ? "active" : ""}
+            aria-current={active.id === module.id ? "page" : undefined}
+            onClick={() => setActiveModule(module.id)}
+          >
+            <strong>{module.label}</strong>
+            <span>{module.description}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="qms-module-content" key={active.id}>
+        {active.content}
+      </div>
+    </section>
+  );
+}
