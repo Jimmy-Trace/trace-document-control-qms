@@ -46,6 +46,79 @@
   min-height: 0;
 }
 
+/* Administration information architecture: keep the top-level page compact and
+   reveal one focused configuration workspace at a time. */
+.section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 18px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-nav button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.section-nav button.active {
+  border-color: #1f4f7a;
+  background: #eef5fb;
+  font-weight: 700;
+}
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.admin-overview-card {
+  display: grid;
+  gap: 6px;
+  min-height: 104px;
+  padding: 18px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.admin-overview-card strong {
+  font-size: 14px;
+}
+
+.admin-overview-card span,
+.section-heading p {
+  color: var(--muted);
+}
+
+.admin-section-stack {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.admin-section-stack .template-layout {
+  padding: 0;
+}
+
+.section-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.section-heading h3,
+.section-heading p {
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .sidebar {
     position: fixed;
@@ -61,5 +134,18 @@
     max-width: 100%;
     min-width: 0;
     overflow-x: visible;
+  }
+
+  .admin-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .section-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .section-nav button {
+    white-space: nowrap;
   }
 }
