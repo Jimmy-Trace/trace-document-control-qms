@@ -13,7 +13,7 @@ export function MembershipAdministration({ embedded = false }: { embedded?: bool
   const [selectedUserId, setSelectedUserId] = useState("");
   const [siteIds, setSiteIds] = useState<string[]>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(embedded);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -35,7 +35,36 @@ export function MembershipAdministration({ embedded = false }: { embedded?: bool
   }
 
   useEffect(() => {
-    if (embedded) void load();
+    if (!embedded) return;
+    let active = true;
+    fetch("/api/admin/memberships", { credentials: "same-origin" })
+      .then(async (response) => ({ response, body: await response.json().catch(() => null) }))
+      .then(({ response, body }) => {
+        if (!active) return;
+        setBusy(false);
+        if (!response.ok) {
+          setOptions(null);
+          setError(response.status === 403 ? "Organizational membership changes require administration access." : body?.error || "Unable to load memberships.");
+          return;
+        }
+        const next = body.data as MembershipOptions;
+        setOptions(next);
+        const first = next.users[0];
+        if (first) {
+          setSelectedUserId(first.id);
+          setSiteIds(first.siteIds);
+          setDepartmentIds(first.departmentIds);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setBusy(false);
+        setOptions(null);
+        setError("Unable to load memberships.");
+      });
+    return () => {
+      active = false;
+    };
   }, [embedded]);
 
   function selectUser(userId: string, source = options) {
