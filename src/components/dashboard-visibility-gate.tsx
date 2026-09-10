@@ -10,8 +10,11 @@ type Visibility = {
   deliveryFailures: boolean;
 };
 
+type DashboardView = "Documents" | "Review queue" | "Administration";
+
 export function DashboardVisibilityGate() {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
+  const [activeView, setActiveView] = useState<DashboardView>("Documents");
 
   useEffect(() => {
     let active = true;
@@ -26,6 +29,35 @@ export function DashboardVisibilityGate() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleNavigation(event: MouseEvent) {
+      const target = event.target instanceof Element ? event.target.closest(".sidebar nav > button") : null;
+      const label = target?.textContent?.trim();
+      if (label === "Documents" || label === "Review queue" || label === "Administration") {
+        setActiveView(label);
+      }
+    }
+
+    document.addEventListener("click", handleNavigation);
+    return () => document.removeEventListener("click", handleNavigation);
+  }, []);
+
+  useEffect(() => {
+    if (activeView !== "Administration") return;
+    const hideLegacyPanels = () => {
+      document.querySelectorAll<HTMLElement>(".admin-stack > section.panel").forEach((panel) => {
+        const heading = panel.querySelector("h2")?.textContent?.trim();
+        if (heading === "Review workflow templates" || heading === "Notification delivery monitoring") {
+          panel.hidden = true;
+        }
+      });
+    };
+    hideLegacyPanels();
+    const observer = new MutationObserver(hideLegacyPanels);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [activeView]);
+
   if (!visibility) return null;
 
   return (
@@ -35,6 +67,7 @@ export function DashboardVisibilityGate() {
       ${visibility.createDocument ? "" : ".page-heading .primary-button{display:none!important}"}
       ${visibility.deliveryFailures ? "" : ".metric-grid > article:nth-child(4){display:none!important}"}
       ${visibility.documents ? "" : ".sidebar nav > button:nth-child(1){display:none!important}"}
+      ${activeView === "Documents" ? "" : ".qms-module-shell{display:none!important}"}
     `}</style>
   );
 }
