@@ -189,8 +189,53 @@
   margin: 0;
 }
 
+/* Legacy document-operation components expose fixed-position launch buttons.
+   Inside the focused module shell they become a deliberate tool panel instead
+   of floating unfinished controls along the viewport edge. */
+.document-operation-launcher-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.document-operation-launchers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.document-operation-launchers > button {
+  position: static !important;
+  inset: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: auto !important;
+  width: 100%;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.document-operation-launchers > button:hover,
+.document-operation-launchers > button:focus-visible {
+  border-color: #1f4f7a;
+  background: #eef5fb;
+}
+
 @media (max-width: 1000px) {
-  .qms-module-nav {
+  .qms-module-nav,
+  .document-operation-launchers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -242,5 +287,9 @@
 
   .qms-module-content {
     padding: 12px;
+  }
+
+  .document-operation-launchers {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
