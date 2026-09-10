@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { GovernedEvidenceFilePicker } from "@/components/governed-evidence-file-picker";
 
 type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; status: "ACTIVE" | "INACTIVE" | "TERMINATED" };
 type Credential = { id: string; employeeId: string; credentialType: string; credentialNumber: string | null; issuingAuthority: string | null; issuedAt: string | null; expiresAt: string | null; fileId: string | null; createdAt: string };
@@ -75,7 +76,7 @@ export function PersonnelCredentialWorkspace({ canManage, today }: { canManage: 
       <label>Issuing authority<input name="issuingAuthority" maxLength={240} /></label>
       <label>Issue date<input name="issuedAt" type="date" /></label>
       <label>Expiration date<input name="expiresAt" type="date" /></label>
-      <label>Evidence file UUID<input name="fileId" placeholder="Optional AVAILABLE file UUID" /></label>
+      <GovernedEvidenceFilePicker disabled={busy} />
       <button type="submit" disabled={busy}>Record credential</button>
     </form>}
     {notice && <p role="status">{notice}</p>}
