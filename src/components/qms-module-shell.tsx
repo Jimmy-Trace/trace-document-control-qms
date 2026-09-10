@@ -4,15 +4,59 @@ import { useMemo, useState, type ReactNode } from "react";
 
 type ModuleId = "documents" | "administration" | "records" | "personnel" | "training" | "quality" | "laboratory" | "reporting";
 
-type ModuleDefinition = {
-  id: ModuleId;
+type ModuleSection = {
+  id: string;
   label: string;
   description: string;
   content: ReactNode;
 };
 
+type ModuleDefinition = {
+  id: ModuleId;
+  label: string;
+  description: string;
+  content?: ReactNode;
+  sections?: ModuleSection[];
+};
+
+function FocusedModuleContent({ module }: { module: ModuleDefinition }) {
+  const sections = useMemo(
+    () => (module.sections ?? []).filter((section) => section.content),
+    [module.sections],
+  );
+  const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? "");
+  const activeSection = sections.find((section) => section.id === activeSectionId) ?? sections[0];
+
+  if (!sections.length) return <div className="qms-module-content">{module.content}</div>;
+
+  return (
+    <>
+      <nav className="qms-subsection-nav" aria-label={`${module.label} sections`}>
+        {sections.map((section) => (
+          <button
+            type="button"
+            key={section.id}
+            className={activeSection?.id === section.id ? "active" : ""}
+            aria-current={activeSection?.id === section.id ? "page" : undefined}
+            onClick={() => setActiveSectionId(section.id)}
+          >
+            <strong>{section.label}</strong>
+            <span>{section.description}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="qms-module-content" key={activeSection?.id}>
+        {activeSection?.content}
+      </div>
+    </>
+  );
+}
+
 export function QmsModuleShell({ modules }: { modules: ModuleDefinition[] }) {
-  const visibleModules = useMemo(() => modules.filter((module) => module.content), [modules]);
+  const visibleModules = useMemo(
+    () => modules.filter((module) => module.content || module.sections?.some((section) => section.content)),
+    [modules],
+  );
   const [activeModule, setActiveModule] = useState<ModuleId>(visibleModules[0]?.id ?? "documents");
   const active = visibleModules.find((module) => module.id === activeModule) ?? visibleModules[0];
 
@@ -41,9 +85,7 @@ export function QmsModuleShell({ modules }: { modules: ModuleDefinition[] }) {
           </button>
         ))}
       </nav>
-      <div className="qms-module-content" key={active.id}>
-        {active.content}
-      </div>
+      <FocusedModuleContent key={active.id} module={active} />
     </section>
   );
 }
