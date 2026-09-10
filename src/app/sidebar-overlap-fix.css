@@ -119,6 +119,82 @@
   margin: 0;
 }
 
+/* Secondary QMS domains now live in a focused module shell. Only one permitted
+   module is presented at a time so the home page no longer becomes a continuous
+   wall of unrelated governed workspaces. */
+.qms-module-shell {
+  width: min(100% - 36px, 1280px);
+  margin: 24px auto 40px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.qms-module-shell-header {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.qms-module-shell-header h2,
+.qms-module-shell-header p {
+  margin: 0;
+}
+
+.qms-module-shell-header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.qms-module-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+
+.qms-module-nav button {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.qms-module-nav button.active {
+  border-color: #1f4f7a;
+  background: #eef5fb;
+}
+
+.qms-module-nav button span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.qms-module-content {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.qms-module-content > .workspace-section,
+.qms-module-content > .panel {
+  margin: 0;
+}
+
+@media (max-width: 1000px) {
+  .qms-module-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .sidebar {
     position: fixed;
@@ -147,5 +223,24 @@
 
   .section-nav button {
     white-space: nowrap;
+  }
+
+  .qms-module-shell {
+    width: calc(100% - 24px);
+    margin: 16px auto 28px;
+  }
+
+  .qms-module-nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+  }
+
+  .qms-module-nav button {
+    flex: 0 0 220px;
+  }
+
+  .qms-module-content {
+    padding: 12px;
   }
 }
