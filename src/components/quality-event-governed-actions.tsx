@@ -36,7 +36,18 @@ export function QualityEventGovernedActions({event,canManage,onChanged}:{event:E
   const [confirmed,setConfirmed]=useState(false);
 
   async function load(){const [i,c]=await Promise.all([fetch(`/api/quality/events/${event.id}/investigations`,{credentials:"same-origin"}),fetch(`/api/quality/events/${event.id}/capa`,{credentials:"same-origin"})]);const ib=await json(i);const cb=await json(c);if(i.ok)setInvestigations(ib?.data??[]);else setError(ib?.error??"Unable to load investigations");if(c.ok)setCapas(cb?.data??[]);else setError(cb?.error??"Unable to load CAPA actions");}
-  useEffect(()=>{void load();},[event.id]);
+  useEffect(()=>{
+    let active=true;
+    Promise.all([
+      fetch(`/api/quality/events/${event.id}/investigations`,{credentials:"same-origin"}),
+      fetch(`/api/quality/events/${event.id}/capa`,{credentials:"same-origin"}),
+    ]).then(async([i,c])=>({i,c,ib:await json(i),cb:await json(c)})).then(({i,c,ib,cb})=>{
+      if(!active)return;
+      if(i.ok)setInvestigations(ib?.data??[]);else setError(ib?.error??"Unable to load investigations");
+      if(c.ok)setCapas(cb?.data??[]);else setError(cb?.error??"Unable to load CAPA actions");
+    });
+    return()=>{active=false;};
+  },[event.id]);
   async function submit(url:string,body:unknown,success:string){setBusy(true);setError("");setNotice("");const response=await fetch(url,{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const result=await json(response);setBusy(false);if(!response.ok){setError(result?.error??"Quality event action failed");return false;}setNotice(success);await load();await onChanged();return true;}
   async function addInvestigation(e:FormEvent){e.preventDefault();if(await submit(`/api/quality/events/${event.id}/investigations`,{findings,affectedScope,evidenceSummary:evidenceSummary||null,rootCauseMethod,rootCause,riskLikelihood,riskImpact},"Investigation evidence recorded.")){setFindings("");setAffectedScope("");setEvidenceSummary("");setRootCause("");}}
   async function addCapa(e:FormEvent){e.preventDefault();if(await submit(`/api/quality/events/${event.id}/capa`,{actionType,description,ownerUserId,dueAt},"CAPA action created.")){setDescription("");setOwnerUserId("");setDueAt("");}}
