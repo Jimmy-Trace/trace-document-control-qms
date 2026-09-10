@@ -60,14 +60,17 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
+  color: #344054;
   padding: 8px 12px;
   font: inherit;
+  font-weight: 650;
   cursor: pointer;
 }
 
 .section-nav button.active {
   border-color: #1f4f7a;
   background: #eef5fb;
+  color: #173f67;
   font-weight: 700;
 }
 
@@ -96,7 +99,7 @@
 
 .admin-overview-card span,
 .section-heading p {
-  color: var(--muted);
+  color: #475467;
 }
 
 .admin-section-stack {
@@ -141,6 +144,10 @@
   margin: 0;
 }
 
+.qms-module-shell-header p {
+  color: #475467;
+}
+
 .qms-module-shell-header > div {
   display: grid;
   gap: 5px;
@@ -164,22 +171,32 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+  color: #27364d;
   cursor: pointer;
 }
 
 .qms-module-nav button.active {
   border-color: #1f4f7a;
   background: #eef5fb;
+  color: #173f67;
 }
 
 .qms-module-nav button span,
-.qms-subsection-nav button span {
-  color: var(--muted);
+.qms-subsection-nav button span,
+.module-subnav button span {
+  color: #475467;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-.qms-subsection-nav {
+.qms-module-nav button strong,
+.qms-subsection-nav button strong,
+.module-subnav button strong {
+  color: #27364d;
+}
+
+.qms-subsection-nav,
+.module-subnav {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -188,7 +205,8 @@
   background: #fff;
 }
 
-.qms-subsection-nav button {
+.qms-subsection-nav button,
+.module-subnav button {
   display: grid;
   gap: 3px;
   min-width: 170px;
@@ -197,13 +215,21 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   background: #f8fafc;
+  color: #27364d;
   font: inherit;
   cursor: pointer;
 }
 
-.qms-subsection-nav button.active {
+.qms-subsection-nav button.active,
+.module-subnav button.active {
   border-color: #1f4f7a;
   background: #eef5fb;
+  color: #173f67;
+}
+
+.qms-subsection-nav button.active strong,
+.module-subnav button.active strong {
+  color: #173f67;
 }
 
 .qms-module-content {
@@ -290,7 +316,8 @@
   }
 
   .section-nav,
-  .qms-subsection-nav {
+  .qms-subsection-nav,
+  .module-subnav {
     overflow-x: auto;
     flex-wrap: nowrap;
   }
@@ -299,7 +326,8 @@
     white-space: nowrap;
   }
 
-  .qms-subsection-nav button {
+  .qms-subsection-nav button,
+  .module-subnav button {
     flex: 0 0 210px;
   }
 
