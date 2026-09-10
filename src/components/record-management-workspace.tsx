@@ -2,24 +2,9 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-type RecordType = {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  active: boolean;
-};
-
-type QualityRecord = {
-  id: string;
-  recordTypeId: string;
-  recordNumber: string;
-  title: string;
-  status: "ACTIVE" | "ARCHIVED";
-  occurredAt: string | null;
-  fileId: string | null;
-  createdAt: string;
-};
+type RecordType = { id: string; code: string; name: string; description: string | null; active: boolean };
+type QualityRecord = { id: string; recordTypeId: string; recordNumber: string; title: string; status: "ACTIVE" | "ARCHIVED"; occurredAt: string | null; fileId: string | null; createdAt: string };
+type Section = "library" | "create" | "types";
 
 export function RecordManagementWorkspace({ canCreate, canArchive, canExport, canConfigureTypes }: { canCreate: boolean; canArchive: boolean; canExport: boolean; canConfigureTypes: boolean }) {
   const [types, setTypes] = useState<RecordType[]>([]);
@@ -27,31 +12,20 @@ export function RecordManagementWorkspace({ canCreate, canArchive, canExport, ca
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState<Section>("library");
 
   async function load() {
-    const [typesResponse, recordsResponse] = await Promise.all([
-      fetch("/api/records/types", { credentials: "same-origin" }),
-      fetch("/api/records", { credentials: "same-origin" }),
-    ]);
+    const [typesResponse, recordsResponse] = await Promise.all([fetch("/api/records/types", { credentials: "same-origin" }), fetch("/api/records", { credentials: "same-origin" })]);
     if (typesResponse.ok) setTypes((await typesResponse.json()).data ?? []);
     if (recordsResponse.ok) setRecords((await recordsResponse.json()).data ?? []);
   }
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      fetch("/api/records/types", { credentials: "same-origin" }),
-      fetch("/api/records", { credentials: "same-origin" }),
-    ]).then(async ([typesResponse, recordsResponse]) => {
+    void Promise.all([fetch("/api/records/types", { credentials: "same-origin" }), fetch("/api/records", { credentials: "same-origin" })]).then(async ([typesResponse, recordsResponse]) => {
       if (cancelled) return;
-      if (typesResponse.ok) {
-        const body = await typesResponse.json();
-        if (!cancelled) setTypes(body.data ?? []);
-      }
-      if (recordsResponse.ok) {
-        const body = await recordsResponse.json();
-        if (!cancelled) setRecords(body.data ?? []);
-      }
+      if (typesResponse.ok) { const body = await typesResponse.json(); if (!cancelled) setTypes(body.data ?? []); }
+      if (recordsResponse.ok) { const body = await recordsResponse.json(); if (!cancelled) setRecords(body.data ?? []); }
     });
     return () => { cancelled = true; };
   }, []);
@@ -62,168 +36,72 @@ export function RecordManagementWorkspace({ canCreate, canArchive, canExport, ca
     if (!normalized) return records;
     return records.filter((record) => {
       const type = typeById.get(record.recordTypeId);
-      return [record.recordNumber, record.title, record.status, type?.code ?? "", type?.name ?? ""]
-        .some((value) => value.toLowerCase().includes(normalized));
+      return [record.recordNumber, record.title, record.status, type?.code ?? "", type?.name ?? ""].some((value) => value.toLowerCase().includes(normalized));
     });
   }, [query, records, typeById]);
 
   async function createType(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy(true);
-    setNotice("");
-    const response = await fetch("/api/records/types", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: String(form.get("code")), name: String(form.get("name")), description: String(form.get("description")) || null }),
-    });
-    const body = await response.json().catch(() => null);
-    setBusy(false);
+    event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setNotice("");
+    const response = await fetch("/api/records/types", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: String(form.get("code")), name: String(form.get("name")), description: String(form.get("description")) || null }) });
+    const body = await response.json().catch(() => null); setBusy(false);
     if (!response.ok) return setNotice(body?.error || "Record type could not be created.");
-    event.currentTarget.reset();
-    setNotice(`Record type ${body.data.code} created with audit evidence.`);
-    await load();
+    event.currentTarget.reset(); setNotice(`Record type ${body.data.code} created with audit evidence.`); await load();
   }
 
   async function createRecord(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBusy(true);
-    setNotice("");
-    const occurredAt = String(form.get("occurredAt"));
-    const response = await fetch("/api/records", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        recordTypeId: String(form.get("recordTypeId")),
-        recordNumber: String(form.get("recordNumber")),
-        title: String(form.get("title")),
-        occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
-        fileId: null,
-      }),
-    });
-    const body = await response.json().catch(() => null);
-    setBusy(false);
+    event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setNotice(""); const occurredAt = String(form.get("occurredAt"));
+    const response = await fetch("/api/records", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recordTypeId: String(form.get("recordTypeId")), recordNumber: String(form.get("recordNumber")), title: String(form.get("title")), occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null, fileId: null }) });
+    const body = await response.json().catch(() => null); setBusy(false);
     if (!response.ok) return setNotice(body?.error || "Record could not be created.");
-    event.currentTarget.reset();
-    setNotice(`Record ${body.data.recordNumber} created with audit evidence.`);
-    await load();
+    event.currentTarget.reset(); setNotice(`Record ${body.data.recordNumber} created with audit evidence.`); await load();
   }
 
   async function archiveRecord(record: QualityRecord) {
-    const reason = window.prompt(`Archive ${record.recordNumber}. Enter the controlled disposition reason:`);
-    if (!reason?.trim()) return;
-    setBusy(true);
-    setNotice("");
-    const response = await fetch("/api/records", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ operation: "ARCHIVE", recordId: record.id, reason }),
-    });
-    const body = await response.json().catch(() => null);
-    setBusy(false);
+    const reason = window.prompt(`Archive ${record.recordNumber}. Enter the controlled disposition reason:`); if (!reason?.trim()) return;
+    setBusy(true); setNotice("");
+    const response = await fetch("/api/records", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ operation: "ARCHIVE", recordId: record.id, reason }) });
+    const body = await response.json().catch(() => null); setBusy(false);
     if (!response.ok) return setNotice(body?.error || "Record could not be archived.");
-    setNotice(`Record ${record.recordNumber} archived with retention and audit evidence.`);
-    await load();
+    setNotice(`Record ${record.recordNumber} archived with retention and audit evidence.`); await load();
   }
 
   async function exportRecord(record: QualityRecord) {
-    const reason = window.prompt(`Export ${record.recordNumber}. Enter the controlled export reason:`);
-    if (!reason?.trim()) return;
-    setBusy(true);
-    setNotice("");
-    const response = await fetch(`/api/records/${record.id}/export`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      setBusy(false);
-      return setNotice(body?.error || "Record could not be exported.");
-    }
-    const blob = await response.blob();
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match?.[1] || `${record.recordNumber}-export`;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setBusy(false);
-    setNotice(`Record ${record.recordNumber} exported after integrity verification with audit evidence.`);
+    const reason = window.prompt(`Export ${record.recordNumber}. Enter the controlled export reason:`); if (!reason?.trim()) return;
+    setBusy(true); setNotice("");
+    const response = await fetch(`/api/records/${record.id}/export`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) });
+    if (!response.ok) { const body = await response.json().catch(() => null); setBusy(false); return setNotice(body?.error || "Record could not be exported."); }
+    const blob = await response.blob(); const disposition = response.headers.get("content-disposition") ?? ""; const match = disposition.match(/filename="([^"]+)"/); const filename = match?.[1] || `${record.recordNumber}-export`; const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); setBusy(false); setNotice(`Record ${record.recordNumber} exported after integrity verification with audit evidence.`);
   }
 
-  return (
-    <section className="workspace-section" aria-labelledby="record-management-heading">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Regulated records</p>
-          <h2 id="record-management-heading">Record management</h2>
-          <p>Create and browse tenant-scoped quality records without rewriting historical record identity.</p>
-        </div>
-      </div>
+  const sections = [
+    { id: "library" as const, label: "Record library", description: "Search, browse, and act on governed regulated records.", visible: true },
+    { id: "create" as const, label: "Create record", description: "Create a tenant-scoped record from an approved record type.", visible: canCreate },
+    { id: "types" as const, label: "Record types", description: "Configure governed record types used for record creation.", visible: canConfigureTypes },
+  ].filter((item) => item.visible);
 
-      {canConfigureTypes && (
-        <form onSubmit={createType} className="admin-form">
-          <label>Record type code<input name="code" maxLength={40} required /></label>
-          <label>Record type name<input name="name" maxLength={200} required /></label>
-          <label>Description<textarea name="description" maxLength={1000} /></label>
-          <button type="submit" disabled={busy}>Create governed record type</button>
-        </form>
-      )}
+  return <section className="workspace-section" aria-labelledby="record-management-heading">
+    <div className="section-heading"><div><p className="eyebrow">Regulated records</p><h2 id="record-management-heading">Record management</h2><p>Open one governed record function at a time without rewriting historical record identity.</p></div></div>
+    <nav className="module-subnav" aria-label="Record management sections">
+      {sections.map((item) => <button key={item.id} type="button" className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)}><strong>{item.label}</strong><span>{item.description}</span></button>)}
+    </nav>
+    {notice && <p role="status">{notice}</p>}
 
-      {canCreate && (
-        <form onSubmit={createRecord} className="admin-form">
-          <label>
-            Record type
-            <select name="recordTypeId" defaultValue="" required>
-              <option value="" disabled>Select a record type</option>
-              {types.filter((type) => type.active).map((type) => <option key={type.id} value={type.id}>{type.code} · {type.name}</option>)}
-            </select>
-          </label>
-          <label>Record number<input name="recordNumber" maxLength={120} required /></label>
-          <label>Title<input name="title" maxLength={300} required /></label>
-          <label>Occurred at<input name="occurredAt" type="datetime-local" /></label>
-          <button type="submit" disabled={busy || !types.some((type) => type.active)}>Create regulated record</button>
-        </form>
-      )}
+    {section === "library" && <div className="module-section-stack">
+      <div className="section-heading"><div><h3>Record library</h3><p>Browse tenant-scoped regulated records and controlled historical state.</p></div></div>
+      <label>Search records<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, type, or status" /></label>
+      <div className="table-wrap"><table><thead><tr><th>Record</th><th>Title</th><th>Type</th><th>Status</th><th>Occurred</th><th>Created</th><th>Actions</th></tr></thead><tbody>
+        {visibleRecords.map((record) => { const type = typeById.get(record.recordTypeId); return <tr key={record.id}><td>{record.recordNumber}</td><td>{record.title}</td><td>{type ? `${type.code} · ${type.name}` : record.recordTypeId}</td><td>{record.status}</td><td>{record.occurredAt ? new Date(record.occurredAt).toLocaleString() : "—"}</td><td>{new Date(record.createdAt).toLocaleString()}</td><td>{canExport && record.fileId && <button type="button" disabled={busy} onClick={() => void exportRecord(record)}>Export exact file</button>}{canArchive && record.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void archiveRecord(record)}>Archive</button>}{!((canExport && record.fileId) || (canArchive && record.status === "ACTIVE")) && "—"}</td></tr>; })}
+        {!visibleRecords.length && <tr><td colSpan={7}>{records.length ? "No records match the current search." : "No regulated records have been created."}</td></tr>}
+      </tbody></table></div>
+    </div>}
 
-      {notice && <p role="status">{notice}</p>}
+    {section === "create" && canCreate && <div className="module-section-stack"><div className="section-heading"><div><h3>Create record</h3><p>Create a governed record using an active approved record type.</p></div></div><form onSubmit={createRecord} className="admin-form">
+      <label>Record type<select name="recordTypeId" defaultValue="" required><option value="" disabled>Select a record type</option>{types.filter((type) => type.active).map((type) => <option key={type.id} value={type.id}>{type.code} · {type.name}</option>)}</select></label>
+      <label>Record number<input name="recordNumber" maxLength={120} required /></label><label>Title<input name="title" maxLength={300} required /></label><label>Occurred at<input name="occurredAt" type="datetime-local" /></label><button type="submit" disabled={busy || !types.some((type) => type.active)}>Create regulated record</button>
+    </form></div>}
 
-      <label>
-        Search records
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, type, or status" />
-      </label>
-
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Record</th><th>Title</th><th>Type</th><th>Status</th><th>Occurred</th><th>Created</th><th>Actions</th></tr></thead>
-          <tbody>
-            {visibleRecords.map((record) => {
-              const type = typeById.get(record.recordTypeId);
-              return <tr key={record.id}>
-                <td>{record.recordNumber}</td>
-                <td>{record.title}</td>
-                <td>{type ? `${type.code} · ${type.name}` : record.recordTypeId}</td>
-                <td>{record.status}</td>
-                <td>{record.occurredAt ? new Date(record.occurredAt).toLocaleString() : "—"}</td>
-                <td>{new Date(record.createdAt).toLocaleString()}</td>
-                <td>
-                  {canExport && record.fileId && <button type="button" disabled={busy} onClick={() => void exportRecord(record)}>Export exact file</button>}
-                  {canArchive && record.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void archiveRecord(record)}>Archive</button>}
-                  {!((canExport && record.fileId) || (canArchive && record.status === "ACTIVE")) && "—"}
-                </td>
-              </tr>;
-            })}
-            {!visibleRecords.length && <tr><td colSpan={7}>{records.length ? "No records match the current search." : "No regulated records have been created."}</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
+    {section === "types" && canConfigureTypes && <div className="module-section-stack"><div className="section-heading"><div><h3>Record types</h3><p>Configure the governed types available for future regulated records.</p></div></div><form onSubmit={createType} className="admin-form">
+      <label>Record type code<input name="code" maxLength={40} required /></label><label>Record type name<input name="name" maxLength={200} required /></label><label>Description<textarea name="description" maxLength={1000} /></label><button type="submit" disabled={busy}>Create governed record type</button>
+    </form></div>}
+  </section>;
 }
