@@ -2,8 +2,9 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { AuditHistory } from "./audit-history";
+import { MembershipAdministration } from "./membership-administration";
 
-type AdminSection = "overview" | "organization" | "access" | "documents" | "audit";
+type AdminSection = "overview" | "organization" | "access" | "memberships" | "documents" | "audit";
 type AdminData = { organization: { displayName: string; loginCode: string }; sites: Array<{ id: string; name: string }>; departments: Array<{ id: string; name: string; siteId: string | null }>; users: Array<{ id: string; email: string; firstName: string; lastName: string; status: string; roles: Array<{ roleId: string }> }>; roles: Array<{ id: string; name: string; permissions: Array<{ permission: { key: string } }> }>; permissions: Array<{ key: string; description: string | null }>; documentTypes: Array<{ id: string; code: string; name: string; reviewMonths: number | null; active: boolean }> };
 
 function permissionDescription(permission: { key: string; description: string | null }) {
@@ -46,6 +47,7 @@ export function AccessAdministration() {
     { id: "overview", label: "Overview", description: "Choose an administration workspace." },
     { id: "organization", label: "Organization", description: "Sites and departments." },
     { id: "access", label: "Users & access", description: "Users, roles, permissions, and assignments." },
+    { id: "memberships", label: "Memberships", description: "Authoritative site and department memberships." },
     { id: "documents", label: "Document configuration", description: "Document types and review intervals." },
     { id: "audit", label: "Audit trail", description: "Append-only administration history." },
   ];
@@ -68,6 +70,8 @@ export function AccessAdministration() {
         <form className="template-form" onSubmit={form("CREATE_ROLE", (f) => ({ name: String(f.get("name")), permissionKeys: f.getAll("permissionKeys").map(String) }))}><strong>Add role</strong><label>Name<input name="name" required /></label><fieldset><legend>Permissions</legend>{data.permissions.map((permission) => <label key={permission.key}><span><input type="checkbox" name="permissionKeys" value={permission.key} /> <strong>{permission.key}</strong></span><small>{permissionDescription(permission)}</small></label>)}</fieldset><button className="primary-button">Create role</button></form>
         <form className="template-form" onSubmit={form("ASSIGN_ROLE", (f) => ({ userId: String(f.get("userId")), roleId: String(f.get("roleId")), ...scopePayload(String(f.get("scopeTarget"))) }))}><strong>Assign role</strong><p>Choose the smallest scope required. Reassigning the same role updates its scope.</p><label>User<select name="userId" required>{data.users.map((user) => <option value={user.id} key={user.id}>{user.firstName} {user.lastName} · {user.email}</option>)}</select></label><label>Role<select name="roleId" required>{data.roles.map((role) => <option value={role.id} key={role.id}>{role.name}</option>)}</select></label><label>Scope<select name="scopeTarget" required><option value="ORGANIZATION">Entire organization</option>{data.sites.map((site) => <option value={`SITE:${site.id}`} key={`site-${site.id}`}>Site · {site.name}</option>)}{data.departments.map((department) => <option value={`DEPARTMENT:${department.id}`} key={`department-${department.id}`}>Department · {department.name}</option>)}</select></label><button className="primary-button">Assign scoped role</button></form>
       </div></div>}
+
+      {section === "memberships" && <MembershipAdministration embedded />}
 
       {section === "documents" && <div className="admin-section-stack"><div className="section-heading"><h3>Document configuration</h3><p>Manage governed document types and their review intervals.</p></div><div className="template-layout">
         <form className="template-form" onSubmit={form("CREATE_DOCUMENT_TYPE", (f) => ({ code: String(f.get("code")), name: String(f.get("name")), reviewMonths: String(f.get("reviewMonths") || "").trim() ? Number(f.get("reviewMonths")) : null }))}><strong>Add document type</strong><label>Code<input name="code" required maxLength={30} placeholder="SOP" /></label><label>Name<input name="name" required maxLength={120} placeholder="Procedure" /></label><label>Review interval (months)<input name="reviewMonths" type="number" min={1} max={120} /></label><button className="primary-button">Create document type</button></form>
