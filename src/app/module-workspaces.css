@@ -55,12 +55,17 @@
   font-weight: 700;
 }
 
-.workspace-section > label.quality-lifecycle-reason {
+.quality-lifecycle-reason {
   width: 100%;
   max-width: none;
+  display: grid;
+  gap: 6px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 700;
 }
 
-.workspace-section > label.quality-lifecycle-reason textarea {
+.quality-lifecycle-reason textarea {
   width: 100%;
   min-height: 76px;
 }
