@@ -73,6 +73,28 @@
   resize: vertical;
 }
 
+.quality-capa-evidence-entry {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.quality-capa-evidence-entry > label {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  gap: 6px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.quality-capa-evidence-entry textarea {
+  width: 100%;
+  min-height: 76px;
+}
+
 .admin-form {
   min-width: 0;
   display: grid;
