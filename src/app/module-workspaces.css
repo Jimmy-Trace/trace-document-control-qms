@@ -55,6 +55,16 @@
   font-weight: 700;
 }
 
+.workspace-section > label.quality-lifecycle-reason {
+  width: 100%;
+  max-width: none;
+}
+
+.workspace-section > label.quality-lifecycle-reason textarea {
+  width: 100%;
+  min-height: 76px;
+}
+
 .workspace-section input,
 .workspace-section select,
 .workspace-section textarea {
