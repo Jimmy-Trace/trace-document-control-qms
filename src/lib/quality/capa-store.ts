@@ -4,6 +4,12 @@ import { QualityCapaValidationError, type CapaRecord, type EffectivenessCheckRec
 
 const allowedStatuses=new Set(["ACTION_REQUIRED","VERIFICATION"]);
 
+async function requireAvailableEvidenceFile(tx:Prisma.TransactionClient,organizationId:string,fileId:string|null){
+  if(!fileId)return;
+  const file=await tx.fileObject.findFirst({where:{organizationId,id:fileId,status:"AVAILABLE"},select:{id:true}});
+  if(!file)throw new QualityCapaValidationError("Supporting evidence file must be AVAILABLE in the same tenant");
+}
+
 export class PrismaQualityCapaStore implements QualityCapaStore{
   list(organizationId:string,eventId:string){return db.$queryRaw<CapaRecord[]>(Prisma.sql`SELECT * FROM "QualityCapaAction" WHERE "organizationId"=${organizationId}::uuid AND "eventId"=${eventId}::uuid ORDER BY "createdAt" ASC`);}
   async create(input:Parameters<QualityCapaStore["create"]>[0]){
@@ -20,15 +26,17 @@ export class PrismaQualityCapaStore implements QualityCapaStore{
     return db.$transaction(async tx=>{
       const rows=await tx.$queryRaw<CapaRecord[]>(Prisma.sql`SELECT * FROM "QualityCapaAction" WHERE "organizationId"=${input.organizationId}::uuid AND "eventId"=${input.eventId}::uuid AND "id"=${input.capaActionId}::uuid FOR UPDATE`);
       const action=rows[0];if(!action)throw new QualityCapaValidationError("CAPA action not found");if(action.status!=="OPEN")throw new QualityCapaValidationError("Only open CAPA actions can be completed");
-      const updatedRows=await tx.$queryRaw<CapaRecord[]>(Prisma.sql`UPDATE "QualityCapaAction" SET "status"='COMPLETED',"completedAt"=CURRENT_TIMESTAMP,"completionEvidence"=${input.completionEvidence} WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.capaActionId}::uuid RETURNING *`);const updated=updatedRows[0];if(!updated)throw new QualityCapaValidationError("CAPA action could not be completed");
-      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_CAPA_ACTION_COMPLETED",entityType:"QualityCapaAction",entityId:updated.id,metadata:{eventId:input.eventId}}});return updated;
+      await requireAvailableEvidenceFile(tx,input.organizationId,input.completionEvidenceFileId);
+      const updatedRows=await tx.$queryRaw<CapaRecord[]>(Prisma.sql`UPDATE "QualityCapaAction" SET "status"='COMPLETED',"completedAt"=CURRENT_TIMESTAMP,"completionEvidence"=${input.completionEvidence},"completionEvidenceFileId"=${input.completionEvidenceFileId}::uuid WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.capaActionId}::uuid RETURNING *`);const updated=updatedRows[0];if(!updated)throw new QualityCapaValidationError("CAPA action could not be completed");
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_CAPA_ACTION_COMPLETED",entityType:"QualityCapaAction",entityId:updated.id,metadata:{eventId:input.eventId,completionEvidenceFileId:input.completionEvidenceFileId}}});return updated;
     });
   }
   async verify(input:Parameters<QualityCapaStore["verify"]>[0]){
     return db.$transaction(async tx=>{
       const actions=await tx.$queryRaw<CapaRecord[]>(Prisma.sql`SELECT * FROM "QualityCapaAction" WHERE "organizationId"=${input.organizationId}::uuid AND "eventId"=${input.eventId}::uuid AND "id"=${input.capaActionId}::uuid FOR UPDATE`);const action=actions[0];if(!action)throw new QualityCapaValidationError("CAPA action not found");if(action.status!=="COMPLETED")throw new QualityCapaValidationError("Effectiveness can be checked only after CAPA completion");
-      const rows=await tx.$queryRaw<EffectivenessCheckRecord[]>(Prisma.sql`INSERT INTO "QualityEffectivenessCheck" ("organizationId","eventId","capaActionId","result","evidence","checkedByUserId") VALUES (${input.organizationId}::uuid,${input.eventId}::uuid,${input.capaActionId}::uuid,${input.result}::"QualityEffectivenessResult",${input.evidence},${input.actorUserId}::uuid) RETURNING *`);const check=rows[0];if(!check)throw new QualityCapaValidationError("Effectiveness check could not be recorded");
-      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_CAPA_EFFECTIVENESS_RECORDED",entityType:"QualityEffectivenessCheck",entityId:check.id,metadata:{eventId:input.eventId,capaActionId:input.capaActionId,result:input.result}}});return check;
+      await requireAvailableEvidenceFile(tx,input.organizationId,input.evidenceFileId);
+      const rows=await tx.$queryRaw<EffectivenessCheckRecord[]>(Prisma.sql`INSERT INTO "QualityEffectivenessCheck" ("organizationId","eventId","capaActionId","result","evidence","evidenceFileId","checkedByUserId") VALUES (${input.organizationId}::uuid,${input.eventId}::uuid,${input.capaActionId}::uuid,${input.result}::"QualityEffectivenessResult",${input.evidence},${input.evidenceFileId}::uuid,${input.actorUserId}::uuid) RETURNING *`);const check=rows[0];if(!check)throw new QualityCapaValidationError("Effectiveness check could not be recorded");
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"QUALITY_CAPA_EFFECTIVENESS_RECORDED",entityType:"QualityEffectivenessCheck",entityId:check.id,metadata:{eventId:input.eventId,capaActionId:input.capaActionId,result:input.result,evidenceFileId:input.evidenceFileId}}});return check;
     });
   }
 }

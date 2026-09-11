@@ -4,9 +4,9 @@ import { QualityCapaService, QualityCapaValidationError, type CapaRecord, type E
 
 const organizationId="00000000-0000-0000-0000-000000000001";const userId="00000000-0000-0000-0000-000000000002";const eventId="00000000-0000-0000-0000-000000000003";const actionId="00000000-0000-0000-0000-000000000004";
 const context=(permissions:string[]):AuthorizationContext=>({organizationId,userId,userState:"ACTIVE",grants:permissions.map(permission=>({permission,scopeType:"ORGANIZATION" as const,scopeId:null}))});
-const action: CapaRecord={id:actionId,organizationId,eventId,actionType:"CORRECTIVE",description:"Correct process",ownerUserId:userId,dueAt:new Date("2026-09-30"),status:"OPEN",completedAt:null,completionEvidence:null,createdByUserId:userId,createdAt:new Date()};
+const action: CapaRecord={id:actionId,organizationId,eventId,actionType:"CORRECTIVE",description:"Correct process",ownerUserId:userId,dueAt:new Date("2026-09-30"),status:"OPEN",completedAt:null,completionEvidence:null,completionEvidenceFileId:null,createdByUserId:userId,createdAt:new Date()};
 const completedAction: CapaRecord={...action,status:"COMPLETED",completedAt:new Date(),completionEvidence:"Implemented"};
-const check: EffectivenessCheckRecord={id:"00000000-0000-0000-0000-000000000005",organizationId,eventId,capaActionId:actionId,result:"PASS",evidence:"No recurrence",checkedByUserId:userId,checkedAt:new Date()};
+const check: EffectivenessCheckRecord={id:"00000000-0000-0000-0000-000000000005",organizationId,eventId,capaActionId:actionId,result:"PASS",evidence:"No recurrence",evidenceFileId:null,checkedByUserId:userId,checkedAt:new Date()};
 const store=():QualityCapaStore=>({list:vi.fn(async()=>[]),create:vi.fn(async()=>action),complete:vi.fn(async()=>completedAction),verify:vi.fn(async()=>check)});
 
 describe("QualityCapaService",()=>{
@@ -15,5 +15,5 @@ describe("QualityCapaService",()=>{
   it("rejects blank action descriptions",()=>{const service=new QualityCapaService(store());expect(()=>service.create(context(["quality_event.manage"]),{organizationId,eventId,actionType:"CORRECTIVE",description:"   ",ownerUserId:userId,dueAt:new Date()})).toThrow(QualityCapaValidationError);});
   it("requires completion evidence",()=>{const service=new QualityCapaService(store());expect(()=>service.complete(context(["quality_event.manage"]),{organizationId,eventId,capaActionId:actionId,completionEvidence:"  "})).toThrow(QualityCapaValidationError);});
   it("requires effectiveness evidence",()=>{const service=new QualityCapaService(store());expect(()=>service.verify(context(["quality_event.manage"]),{organizationId,eventId,capaActionId:actionId,result:"PASS",evidence:"  "})).toThrow(QualityCapaValidationError);});
-  it("normalizes governed evidence before persistence",async()=>{const s=store();const service=new QualityCapaService(s);await service.complete(context(["quality_event.manage"]),{organizationId,eventId,capaActionId:actionId,completionEvidence:"  Implemented and reviewed  "});expect(s.complete).toHaveBeenCalledWith(expect.objectContaining({completionEvidence:"Implemented and reviewed",actorUserId:userId}));});
+  it("normalizes governed evidence before persistence",async()=>{const s=store();const service=new QualityCapaService(s);await service.complete(context(["quality_event.manage"]),{organizationId,eventId,capaActionId:actionId,completionEvidence:"  Implemented and reviewed  "});expect(s.complete).toHaveBeenCalledWith(expect.objectContaining({completionEvidence:"Implemented and reviewed",completionEvidenceFileId:null,actorUserId:userId}));});
 });
