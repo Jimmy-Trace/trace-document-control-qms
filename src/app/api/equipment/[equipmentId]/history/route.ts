@@ -18,8 +18,12 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{equipmen
     const context=await authenticateRequest(request);
     const {equipmentId}=await params;
     requireAuthorization(context,{organizationId:context.organizationId,permission:"equipment.read"});
-    const equipment=await db.equipment.findFirst({where:{organizationId:context.organizationId,id:equipmentId},select:{id:true}});
-    if(!equipment)return NextResponse.json({error:"Equipment not found"},{status:404});
+    const equipment=await db.$queryRaw<Array<{id:string}>>(Prisma.sql`
+      SELECT id FROM "Equipment"
+      WHERE "organizationId"=${context.organizationId}::uuid AND id=${equipmentId}::uuid
+      LIMIT 1
+    `);
+    if(!equipment[0])return NextResponse.json({error:"Equipment not found"},{status:404});
     const data=await db.$queryRaw<HistoryEntry[]>(Prisma.sql`
       SELECT e.id,'EVENT'::text AS kind,e."occurredAt",e."eventType"::text AS label,e.summary,e."evidenceFileId"
       FROM "EquipmentEvent" e
