@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import styles from "./governed-evidence-file-picker.module.css";
 
 type EvidenceFile = { id: string; originalName: string; mimeType: string; sizeBytes: string; sha256: string; status: string };
-type EvidenceDomain = "personnel" | "training" | "quality";
+type EvidenceDomain = "personnel" | "training" | "quality" | "equipment";
 const ACCEPTED = ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tif,.tiff,.txt,.csv";
 
 export function GovernedEvidenceFilePicker({ name = "fileId", disabled = false, domain = "personnel", onSelectionChange }: { name?: string; disabled?: boolean; domain?: EvidenceDomain; onSelectionChange?: (fileId: string) => void }) {
