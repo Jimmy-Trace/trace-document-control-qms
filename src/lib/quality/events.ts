@@ -13,6 +13,8 @@ export type QualityEventRecord = {
   summary:string; description:string|null; discoveredAt:Date; reportedByUserId:string; ownerUserId:string|null; dueAt:Date|null; createdAt:Date; updatedAt:Date;
 };
 
+export type QualityEventOwnerOption={id:string;email:string;firstName:string;lastName:string};
+
 export type QualityEventLifecycleUpdate = {
   organizationId:string; eventId:string; reason:string; actorUserId:string;
   status?:QualityEventStatus; ownerUserId?:string|null; dueAt?:Date|null;
@@ -20,6 +22,7 @@ export type QualityEventLifecycleUpdate = {
 
 export interface QualityEventStore {
   listEvents(organizationId:string, status?:QualityEventStatus):Promise<QualityEventRecord[]>;
+  listAssignableOwners(organizationId:string):Promise<QualityEventOwnerOption[]>;
   createEvent(input:{organizationId:string;type:QualityEventType;severity:QualityEventSeverity;source:QualityEventSource;summary:string;description:string|null;discoveredAt:Date;ownerUserId:string|null;dueAt:Date|null;actorUserId:string}):Promise<QualityEventRecord>;
   updateLifecycle(input:QualityEventLifecycleUpdate):Promise<QualityEventRecord>;
 }
@@ -30,6 +33,11 @@ export class QualityEventService {
   listEvents(context:AuthorizationContext, organizationId:string, status?:QualityEventStatus) {
     requireAuthorization(context,{organizationId,permission:"quality_event.read"});
     return this.store.listEvents(organizationId,status);
+  }
+
+  listAssignableOwners(context:AuthorizationContext, organizationId:string) {
+    requireAuthorization(context,{organizationId,permission:"quality_event.manage"});
+    return this.store.listAssignableOwners(organizationId);
   }
 
   createEvent(context:AuthorizationContext,input:{organizationId:string;type:QualityEventType;severity:QualityEventSeverity;source?:QualityEventSource;summary:string;description?:string|null;discoveredAt:Date;ownerUserId?:string|null;dueAt?:Date|null}) {
