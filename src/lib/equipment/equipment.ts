@@ -15,6 +15,13 @@ export interface EquipmentStore{
   transition(input:{organizationId:string;equipmentId:string;status:EquipmentStatus;reason:string;actorUserId:string}):Promise<EquipmentRecord>;
 }
 
+function validateEquipmentDate(label:string,value:Date|null|undefined){
+  if(!value)return;
+  if(Number.isNaN(value.getTime()))throw new EquipmentValidationError(`${label} is invalid`);
+  const year=value.getUTCFullYear();
+  if(year<1900||year>9999)throw new EquipmentValidationError(`${label} year must be between 1900 and 9999`);
+}
+
 export class EquipmentService{
   constructor(private readonly store:EquipmentStore){}
   list(context:AuthorizationContext,organizationId:string){requireAuthorization(context,{organizationId,permission:"equipment.read"});return this.store.list(organizationId);}
@@ -26,6 +33,11 @@ export class EquipmentService{
     const calibrationRequired=input.calibrationRequired??false, maintenanceRequired=input.maintenanceRequired??false;
     if(calibrationRequired&&(!input.calibrationIntervalDays||input.calibrationIntervalDays<1))throw new EquipmentValidationError("Calibration interval is required for calibration-controlled equipment");
     if(maintenanceRequired&&(!input.maintenanceIntervalDays||input.maintenanceIntervalDays<1))throw new EquipmentValidationError("Maintenance interval is required for maintenance-controlled equipment");
+    validateEquipmentDate("Received date",input.receivedAt);
+    validateEquipmentDate("Next calibration due date",input.nextCalibrationDueAt);
+    validateEquipmentDate("Next maintenance due date",input.nextMaintenanceDueAt);
+    if(input.receivedAt&&input.nextCalibrationDueAt&&input.nextCalibrationDueAt<input.receivedAt)throw new EquipmentValidationError("Next calibration due date cannot be earlier than the received date");
+    if(input.receivedAt&&input.nextMaintenanceDueAt&&input.nextMaintenanceDueAt<input.receivedAt)throw new EquipmentValidationError("Next maintenance due date cannot be earlier than the received date");
     return this.store.create({...input,equipmentNumber,name,manufacturer:input.manufacturer?.trim()||null,model:input.model?.trim()||null,serialNumber:input.serialNumber?.trim()||null,siteId:input.siteId??null,departmentId:input.departmentId??null,receivedAt:input.receivedAt??null,calibrationRequired,calibrationIntervalDays:calibrationRequired?input.calibrationIntervalDays??null:null,nextCalibrationDueAt:calibrationRequired?input.nextCalibrationDueAt??null:null,maintenanceRequired,maintenanceIntervalDays:maintenanceRequired?input.maintenanceIntervalDays??null:null,nextMaintenanceDueAt:maintenanceRequired?input.nextMaintenanceDueAt??null:null,actorUserId:context.userId});
   }
   listEvents(context:AuthorizationContext,organizationId:string,equipmentId:string){requireAuthorization(context,{organizationId,permission:"equipment.read"});return this.store.listEvents(organizationId,equipmentId);}
