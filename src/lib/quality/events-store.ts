@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../db";
-import { QualityEventValidationError, type QualityEventLifecycleUpdate, type QualityEventRecord, type QualityEventStatus, type QualityEventStore } from "./events";
+import { QualityEventValidationError, type QualityEventLifecycleUpdate, type QualityEventOwnerOption, type QualityEventRecord, type QualityEventStatus, type QualityEventStore } from "./events";
 
 const nextStatus:Record<Exclude<QualityEventStatus,"CLOSED">,QualityEventStatus|undefined>={OPEN:"INVESTIGATING",INVESTIGATING:"ACTION_REQUIRED",ACTION_REQUIRED:"VERIFICATION",VERIFICATION:undefined};
 
@@ -9,6 +9,14 @@ export class PrismaQualityEventStore implements QualityEventStore {
     return db.$queryRaw<QualityEventRecord[]>(status
       ? Prisma.sql`SELECT * FROM "QualityEvent" WHERE "organizationId"=${organizationId}::uuid AND "status"=${status}::"QualityEventStatus" ORDER BY "createdAt" DESC`
       : Prisma.sql`SELECT * FROM "QualityEvent" WHERE "organizationId"=${organizationId}::uuid ORDER BY "createdAt" DESC`);
+  }
+
+  listAssignableOwners(organizationId:string) {
+    return db.user.findMany({
+      where:{organizationId,status:"ACTIVE"},
+      orderBy:[{lastName:"asc"},{firstName:"asc"},{email:"asc"}],
+      select:{id:true,email:true,firstName:true,lastName:true},
+    }) as Promise<QualityEventOwnerOption[]>;
   }
 
   async createEvent(input:{organizationId:string;type:QualityEventRecord["type"];severity:QualityEventRecord["severity"];source:QualityEventRecord["source"];summary:string;description:string|null;discoveredAt:Date;ownerUserId:string|null;dueAt:Date|null;actorUserId:string}) {
