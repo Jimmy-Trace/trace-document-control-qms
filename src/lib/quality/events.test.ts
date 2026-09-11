@@ -8,6 +8,7 @@ const context=(permissions:string[]):AuthorizationContext=>({organizationId,user
 const event=(status:QualityEventRecord["status"]="OPEN"):QualityEventRecord=>({id:"00000000-0000-0000-0000-000000000003",organizationId,eventNumber:"QE-2026-000001",type:"NONCONFORMANCE",severity:"MEDIUM",source:"MANUAL",status,summary:"Example",description:null,discoveredAt:new Date(),reportedByUserId:userId,ownerUserId:null,dueAt:null,createdAt:new Date(),updatedAt:new Date()});
 const store=():QualityEventStore=>({
   listEvents:vi.fn(async()=>[]),
+  listAssignableOwners:vi.fn(async()=>[]),
   createEvent:vi.fn(async (input: Parameters<QualityEventStore["createEvent"]>[0]): Promise<QualityEventRecord>=>({...event(),organizationId:input.organizationId,type:input.type,severity:input.severity,source:input.source,summary:input.summary,description:input.description,discoveredAt:input.discoveredAt,reportedByUserId:input.actorUserId,ownerUserId:input.ownerUserId,dueAt:input.dueAt})),
   updateLifecycle:vi.fn(async()=>event("INVESTIGATING")),
 });
