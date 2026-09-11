@@ -20,12 +20,22 @@ const allowedTypes = new Set([
 ]);
 const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 180) || "evidence";
 
-type EvidenceDomain = "personnel" | "training";
+type EvidenceDomain = "personnel" | "training" | "quality";
 function getDomain(request: NextRequest): EvidenceDomain {
-  return request.nextUrl.searchParams.get("domain") === "training" ? "training" : "personnel";
+  const value = request.nextUrl.searchParams.get("domain");
+  if (value === "training" || value === "quality") return value;
+  return "personnel";
 }
-function readPermission(domain: EvidenceDomain) { return domain === "training" ? "training.read" : "personnel.read"; }
-function managePermission(domain: EvidenceDomain) { return domain === "training" ? "training.manage" : "personnel.manage"; }
+function readPermission(domain: EvidenceDomain) {
+  if (domain === "training") return "training.read";
+  if (domain === "quality") return "quality_event.read";
+  return "personnel.read";
+}
+function managePermission(domain: EvidenceDomain) {
+  if (domain === "training") return "training.manage";
+  if (domain === "quality") return "quality_event.manage";
+  return "personnel.manage";
+}
 
 export async function GET(request: NextRequest) {
   try {
