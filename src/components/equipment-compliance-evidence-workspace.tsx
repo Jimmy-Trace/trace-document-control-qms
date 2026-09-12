@@ -66,7 +66,7 @@ export function EquipmentComplianceEvidenceWorkspace({today}:{today:string}){
       {selectedItem&&<p><strong>Current calibration due:</strong> {selectedItem.nextCalibrationDueAt?.slice(0,10)??"—"} · <strong>Current maintenance due:</strong> {selectedItem.nextMaintenanceDueAt?.slice(0,10)??"—"}</p>}
       <label>Evidence type<select value={eventType} onChange={event=>{setEventType(event.target.value as EventType);setMessage("");setEvidenceFileId("");}}><option value="CALIBRATED">Calibration completed</option><option value="MAINTENANCE">Preventive maintenance completed</option></select></label>
       <label>Completed date<input required type="date" value={eventDate} onChange={event=>setEventDate(event.target.value)}/></label>
-      <label>Evidence summary<textarea required maxLength={5000} value={summary} onChange={event=>setSummary(event.target.value)}/></label>
+      <label style={{width:"100%"}}>Evidence summary<textarea required rows={3} maxLength={5000} value={summary} onChange={event=>setSummary(event.target.value)} style={{width:"100%",boxSizing:"border-box",resize:"vertical"}}/></label>
       <GovernedEvidenceFilePicker key={`${selected}:${eventType}`} domain="equipment" name="equipmentComplianceEvidenceFileId" onSelectionChange={setEvidenceFileId}/>
       <button type="submit" disabled={!selected||!eventDate||!summary.trim()||!evidenceFileId}>Record governed evidence</button>
       {message&&<p role="status">{message}</p>}
