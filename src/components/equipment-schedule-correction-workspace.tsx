@@ -13,6 +13,16 @@ type EquipmentItem={
   nextMaintenanceDueAt:string|null;
 };
 
+const datePattern=/^\d{4}-\d{2}-\d{2}$/;
+function normalizedDate(value:string|null|undefined){return value?.slice(0,10)??"";}
+function validGovernedDate(value:string){
+  if(!datePattern.test(value))return false;
+  const year=Number(value.slice(0,4));
+  if(year<1900||year>9999)return false;
+  const parsed=new Date(`${value}T12:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime())&&parsed.toISOString().slice(0,10)===value;
+}
+
 export function EquipmentScheduleCorrectionWorkspace(){
   const [equipment,setEquipment]=useState<EquipmentItem[]>([]);
   const [selected,setSelected]=useState("");
@@ -24,8 +34,8 @@ export function EquipmentScheduleCorrectionWorkspace(){
   const selectedItem=useMemo(()=>equipment.find(item=>item.id===selected)??null,[equipment,selected]);
 
   function applySchedule(item:EquipmentItem|null){
-    setNextCalibrationDueAt(item?.nextCalibrationDueAt?.slice(0,10)??"");
-    setNextMaintenanceDueAt(item?.nextMaintenanceDueAt?.slice(0,10)??"");
+    setNextCalibrationDueAt(normalizedDate(item?.nextCalibrationDueAt));
+    setNextMaintenanceDueAt(normalizedDate(item?.nextMaintenanceDueAt));
   }
 
   async function loadEquipment(preferredId?:string){
@@ -58,6 +68,8 @@ export function EquipmentScheduleCorrectionWorkspace(){
   async function correctSchedule(event:React.FormEvent){
     event.preventDefault();
     if(!selected||!selectedItem)return;
+    if(selectedItem.calibrationRequired&&!validGovernedDate(nextCalibrationDueAt)){setMessage("Enter the next calibration due date as YYYY-MM-DD using a year from 1900 through 9999.");return;}
+    if(selectedItem.maintenanceRequired&&!validGovernedDate(nextMaintenanceDueAt)){setMessage("Enter the next maintenance due date as YYYY-MM-DD using a year from 1900 through 9999.");return;}
     setMessage("");
     const response=await fetch(`/api/equipment/${selected}`,{
       method:"PATCH",
@@ -79,16 +91,21 @@ export function EquipmentScheduleCorrectionWorkspace(){
     }
   }
 
+  const calibrationMissing=Boolean(selectedItem?.calibrationRequired)&&!nextCalibrationDueAt.trim();
+  const maintenanceMissing=Boolean(selectedItem?.maintenanceRequired)&&!nextMaintenanceDueAt.trim();
+  const missingReason=!reason.trim();
+
   return <section className="card form-stack equipment-register-style">
     <h3>Correct compliance schedule</h3>
     <p>Correct an equipment calibration or maintenance due date when a documented data-entry error is identified. A required reason and before/after values are preserved in the audit trail and Operational history.</p>
     <form className="admin-form equipment-admin-form" onSubmit={correctSchedule}>
       <label>Equipment<select required value={selected} onChange={event=>changeEquipment(event.target.value)} disabled={!equipment.length}>{equipment.length?equipment.map(item=><option key={item.id} value={item.id}>{item.equipmentNumber} — {item.name}</option>):<option value="">No equipment registered</option>}</select></label>
-      {selectedItem&&<p className="equipment-form-span"><strong>Current calibration due:</strong> {selectedItem.nextCalibrationDueAt?.slice(0,10)??"—"} · <strong>Current maintenance due:</strong> {selectedItem.nextMaintenanceDueAt?.slice(0,10)??"—"}</p>}
-      <label>Next calibration due<input type="date" required={Boolean(selectedItem?.calibrationRequired)} disabled={!selectedItem?.calibrationRequired} value={nextCalibrationDueAt} onChange={event=>setNextCalibrationDueAt(event.target.value)}/></label>
-      <label>Next maintenance due<input type="date" required={Boolean(selectedItem?.maintenanceRequired)} disabled={!selectedItem?.maintenanceRequired} value={nextMaintenanceDueAt} onChange={event=>setNextMaintenanceDueAt(event.target.value)}/></label>
+      {selectedItem&&<p className="equipment-form-span"><strong>Current calibration due:</strong> {normalizedDate(selectedItem.nextCalibrationDueAt)||"—"} · <strong>Current maintenance due:</strong> {normalizedDate(selectedItem.nextMaintenanceDueAt)||"—"}</p>}
+      <label>Next calibration due<input type="text" inputMode="numeric" placeholder="YYYY-MM-DD" required={Boolean(selectedItem?.calibrationRequired)} disabled={!selectedItem?.calibrationRequired} value={nextCalibrationDueAt} onChange={event=>setNextCalibrationDueAt(event.target.value)} maxLength={10} aria-describedby="equipment-calibration-date-help"/><span id="equipment-calibration-date-help" className="field-help">YYYY-MM-DD. Existing legacy values remain editable so they can be corrected through this governed workflow.</span></label>
+      <label>Next maintenance due<input type="text" inputMode="numeric" placeholder="YYYY-MM-DD" required={Boolean(selectedItem?.maintenanceRequired)} disabled={!selectedItem?.maintenanceRequired} value={nextMaintenanceDueAt} onChange={event=>setNextMaintenanceDueAt(event.target.value)} maxLength={10} aria-describedby="equipment-maintenance-date-help"/><span id="equipment-maintenance-date-help" className="field-help">YYYY-MM-DD. Enter the intended corrected due date; this does not record completed maintenance.</span></label>
       <label className="equipment-form-wide">Required correction reason<textarea required rows={3} maxLength={1000} value={reason} onChange={event=>setReason(event.target.value)}/></label>
-      <button type="submit" disabled={!selected||!reason.trim()||(Boolean(selectedItem?.calibrationRequired)&&!nextCalibrationDueAt)||(Boolean(selectedItem?.maintenanceRequired)&&!nextMaintenanceDueAt)}>Save governed schedule correction</button>
+      {(calibrationMissing||maintenanceMissing||missingReason)&&selectedItem&&<p className="equipment-form-span" role="status">To save this governed correction, complete {calibrationMissing?"the next calibration due date":maintenanceMissing?"the next maintenance due date":"the required correction reason"}.</p>}
+      <button type="submit" disabled={!selected||calibrationMissing||maintenanceMissing||missingReason}>Save governed schedule correction</button>
       {message&&<p className="equipment-form-span" role="status">{message}</p>}
       {error&&<p className="status-error equipment-form-span">{error}</p>}
     </form>
