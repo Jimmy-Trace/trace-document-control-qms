@@ -18,6 +18,7 @@ import { CompetencyManagementWorkspace } from "@/components/competency-managemen
 import { QualityEventWorkspace } from "@/components/quality-event-workspace";
 import { EquipmentManagementWorkspace } from "@/components/equipment-management-workspace";
 import { EquipmentComplianceWorkspace } from "@/components/equipment-compliance-workspace";
+import { EquipmentComplianceEvidenceWorkspace } from "@/components/equipment-compliance-evidence-workspace";
 import { ReportingWorkspace } from "@/components/reporting-workspace";
 import { QmsModuleShell } from "@/components/qms-module-shell";
 import { cookies } from "next/headers";
@@ -116,6 +117,7 @@ export default async function HomePage() {
   const laboratory = visibility.equipmentManagement ? (
     <>
       <EquipmentManagementWorkspace canManage={visibility.equipmentManage} />
+      {visibility.equipmentManage && <EquipmentComplianceEvidenceWorkspace today={today} />}
       <EquipmentComplianceWorkspace canManage={visibility.equipmentManage} />
     </>
   ) : null;
