@@ -19,6 +19,7 @@ import { QualityEventWorkspace } from "@/components/quality-event-workspace";
 import { EquipmentManagementWorkspace } from "@/components/equipment-management-workspace";
 import { EquipmentComplianceWorkspace } from "@/components/equipment-compliance-workspace";
 import { EquipmentComplianceEvidenceWorkspace } from "@/components/equipment-compliance-evidence-workspace";
+import { EquipmentScheduleCorrectionWorkspace } from "@/components/equipment-schedule-correction-workspace";
 import { ReportingWorkspace } from "@/components/reporting-workspace";
 import { QmsModuleShell } from "@/components/qms-module-shell";
 import { cookies } from "next/headers";
@@ -118,6 +119,7 @@ export default async function HomePage() {
     <>
       <EquipmentManagementWorkspace canManage={visibility.equipmentManage} />
       {visibility.equipmentManage && <EquipmentComplianceEvidenceWorkspace today={today} />}
+      {visibility.equipmentManage && <EquipmentScheduleCorrectionWorkspace />}
       <EquipmentComplianceWorkspace canManage={visibility.equipmentManage} />
     </>
   ) : null;
