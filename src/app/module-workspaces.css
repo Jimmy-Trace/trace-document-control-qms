@@ -251,6 +251,45 @@
   overflow-wrap: anywhere;
 }
 
+.equipment-register-style {
+  padding: 16px;
+  border: 1px solid #e1e6ee;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.equipment-register-style > h3 {
+  margin-bottom: 2px;
+}
+
+.equipment-admin-form {
+  margin-top: 8px;
+  background: #fff;
+}
+
+.equipment-form-span {
+  grid-column: 1 / -1;
+}
+
+.admin-form > .equipment-form-wide {
+  grid-column: span 9;
+}
+
+.equipment-register-style .form-stack {
+  padding: 14px;
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.equipment-register-style .form-stack > label {
+  display: grid;
+  gap: 6px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 @media (max-width: 1180px) {
   .admin-form > label,
   .admin-form > button {
@@ -258,6 +297,10 @@
   }
 
   .admin-form > label:has(textarea) {
+    grid-column: span 8;
+  }
+
+  .admin-form > .equipment-form-wide {
     grid-column: span 8;
   }
 }
@@ -269,7 +312,8 @@
 
   .admin-form > label,
   .admin-form > label:has(textarea),
-  .admin-form > button {
+  .admin-form > button,
+  .admin-form > .equipment-form-wide {
     grid-column: span 6;
   }
 
@@ -293,7 +337,9 @@
 
   .admin-form > label,
   .admin-form > label:has(textarea),
-  .admin-form > button {
+  .admin-form > button,
+  .admin-form > .equipment-form-wide,
+  .equipment-form-span {
     grid-column: 1;
   }
 
