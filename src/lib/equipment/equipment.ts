@@ -13,6 +13,7 @@ export interface EquipmentStore{
   listEvents(organizationId:string,equipmentId:string):Promise<EquipmentEventRecord[]>;
   addEvent(input:{organizationId:string;equipmentId:string;eventType:EquipmentEventType;occurredAt:Date;summary:string;evidenceFileId:string|null;performedByUserId:string|null;actorUserId:string}):Promise<EquipmentEventRecord>;
   transition(input:{organizationId:string;equipmentId:string;status:EquipmentStatus;reason:string;actorUserId:string}):Promise<EquipmentRecord>;
+  correctSchedule(input:{organizationId:string;equipmentId:string;nextCalibrationDueAt:Date|null;nextMaintenanceDueAt:Date|null;reason:string;actorUserId:string}):Promise<EquipmentRecord>;
 }
 
 function validateEquipmentDate(label:string,value:Date|null|undefined){
@@ -52,5 +53,13 @@ export class EquipmentService{
     const reason=input.reason.trim();
     if(!reason||reason.length>1000)throw new EquipmentValidationError("Equipment lifecycle reason is required and must not exceed 1000 characters");
     return this.store.transition({...input,reason,actorUserId:context.userId});
+  }
+  correctSchedule(context:AuthorizationContext,input:{organizationId:string;equipmentId:string;nextCalibrationDueAt:Date|null;nextMaintenanceDueAt:Date|null;reason:string}){
+    requireAuthorization(context,{organizationId:input.organizationId,permission:"equipment.manage"});
+    const reason=input.reason.trim();
+    if(!reason||reason.length>1000)throw new EquipmentValidationError("Schedule correction reason is required and must not exceed 1000 characters");
+    validateEquipmentDate("Next calibration due date",input.nextCalibrationDueAt);
+    validateEquipmentDate("Next maintenance due date",input.nextMaintenanceDueAt);
+    return this.store.correctSchedule({...input,reason,actorUserId:context.userId});
   }
 }
