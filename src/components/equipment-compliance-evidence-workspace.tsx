@@ -55,7 +55,13 @@ export function EquipmentComplianceEvidenceWorkspace({today}:{today:string}){
     const body=await response.json().catch(()=>null);
     const label=eventType==="CALIBRATED"?"Calibration":"Maintenance";
     setMessage(response.ok?`${label} evidence recorded and next due date advanced from the governed interval.`:body?.error??`${label} evidence could not be recorded`);
-    if(response.ok){setSummary("");setEvidenceFileId("");await loadEquipment();}
+    if(response.ok){
+      const changedEquipmentId=selected;
+      setSummary("");
+      setEvidenceFileId("");
+      await loadEquipment();
+      window.dispatchEvent(new CustomEvent("qms:equipment-changed",{detail:{equipmentId:changedEquipmentId}}));
+    }
   }
 
   return <section className="card form-stack equipment-register-style">
