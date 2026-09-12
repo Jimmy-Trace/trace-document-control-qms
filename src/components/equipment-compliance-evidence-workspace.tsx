@@ -58,19 +58,19 @@ export function EquipmentComplianceEvidenceWorkspace({today}:{today:string}){
     if(response.ok){setSummary("");setEvidenceFileId("");await loadEquipment();}
   }
 
-  return <section className="card form-stack">
+  return <section className="card form-stack equipment-register-style">
     <h3>Calibration & maintenance evidence</h3>
     <p>Record completed calibration or preventive maintenance with governed supporting evidence. The next due date is calculated from the recorded event date and the equipment&apos;s configured interval.</p>
-    <form className="form-stack" onSubmit={recordEvidence}>
+    <form className="admin-form equipment-admin-form" onSubmit={recordEvidence}>
       <label>Equipment<select required value={selected} onChange={event=>{setSelected(event.target.value);setMessage("");setEvidenceFileId("");}} disabled={!equipment.length}>{equipment.length?equipment.map(item=><option key={item.id} value={item.id}>{item.equipmentNumber} — {item.name}</option>):<option value="">Register equipment first</option>}</select></label>
-      {selectedItem&&<p><strong>Current calibration due:</strong> {selectedItem.nextCalibrationDueAt?.slice(0,10)??"—"} · <strong>Current maintenance due:</strong> {selectedItem.nextMaintenanceDueAt?.slice(0,10)??"—"}</p>}
+      {selectedItem&&<p className="equipment-form-span"><strong>Current calibration due:</strong> {selectedItem.nextCalibrationDueAt?.slice(0,10)??"—"} · <strong>Current maintenance due:</strong> {selectedItem.nextMaintenanceDueAt?.slice(0,10)??"—"}</p>}
       <label>Evidence type<select value={eventType} onChange={event=>{setEventType(event.target.value as EventType);setMessage("");setEvidenceFileId("");}}><option value="CALIBRATED">Calibration completed</option><option value="MAINTENANCE">Preventive maintenance completed</option></select></label>
       <label>Completed date<input required type="date" value={eventDate} onChange={event=>setEventDate(event.target.value)}/></label>
-      <label style={{width:"100%"}}>Evidence summary<textarea required rows={3} maxLength={5000} value={summary} onChange={event=>setSummary(event.target.value)} style={{width:"100%",boxSizing:"border-box",resize:"vertical"}}/></label>
-      <GovernedEvidenceFilePicker key={`${selected}:${eventType}`} domain="equipment" name="equipmentComplianceEvidenceFileId" onSelectionChange={setEvidenceFileId}/>
+      <label className="equipment-form-wide">Evidence summary<textarea required rows={3} maxLength={5000} value={summary} onChange={event=>setSummary(event.target.value)}/></label>
+      <div className="equipment-form-span"><GovernedEvidenceFilePicker key={`${selected}:${eventType}`} domain="equipment" name="equipmentComplianceEvidenceFileId" onSelectionChange={setEvidenceFileId}/></div>
       <button type="submit" disabled={!selected||!eventDate||!summary.trim()||!evidenceFileId}>Record governed evidence</button>
-      {message&&<p role="status">{message}</p>}
-      {error&&<p className="status-error">{error}</p>}
+      {message&&<p className="equipment-form-span" role="status">{message}</p>}
+      {error&&<p className="status-error equipment-form-span">{error}</p>}
     </form>
   </section>;
 }
