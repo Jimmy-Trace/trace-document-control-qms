@@ -39,7 +39,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{equipmen
       FROM "EquipmentServiceRecord" r
       WHERE r."organizationId"=${context.organizationId}::uuid AND r."equipmentId"=${equipmentId}::uuid
       UNION ALL
-      SELECT a.id,'AUDIT'::text AS kind,a."createdAt",'SCHEDULE CORRECTED'::text AS label,
+      SELECT a.id,'AUDIT'::text AS kind,a."occurredAt",'SCHEDULE CORRECTED'::text AS label,
         a.reason||' · Calibration due: '||COALESCE(NULLIF(left(a.metadata->>'previousCalibrationDueAt',10),''),'—')||' → '||COALESCE(NULLIF(left(a.metadata->>'nextCalibrationDueAt',10),''),'—')||' · Maintenance due: '||COALESCE(NULLIF(left(a.metadata->>'previousMaintenanceDueAt',10),''),'—')||' → '||COALESCE(NULLIF(left(a.metadata->>'nextMaintenanceDueAt',10),''),'—') AS summary,
         NULL::uuid AS "evidenceFileId"
       FROM "AuditEvent" a
