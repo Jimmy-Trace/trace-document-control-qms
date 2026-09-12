@@ -62,4 +62,19 @@ export class PrismaEquipmentStore implements EquipmentStore{
       return updated;
     });
   }
+  async correctSchedule(input:Parameters<EquipmentStore["correctSchedule"]>[0]){
+    return db.$transaction(async tx=>{
+      const equipment=(await tx.$queryRaw<EquipmentRecord[]>(Prisma.sql`SELECT * FROM "Equipment" WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.equipmentId}::uuid FOR UPDATE`))[0];
+      if(!equipment)throw new EquipmentValidationError("Equipment not found");
+      if(equipment.status==="RETIRED")throw new EquipmentValidationError("Retired equipment schedule cannot be corrected");
+      if(equipment.calibrationRequired&&input.nextCalibrationDueAt===null)throw new EquipmentValidationError("Calibration-controlled equipment requires a next calibration due date");
+      if(equipment.maintenanceRequired&&input.nextMaintenanceDueAt===null)throw new EquipmentValidationError("Maintenance-controlled equipment requires a next maintenance due date");
+      if(equipment.receivedAt&&input.nextCalibrationDueAt&&input.nextCalibrationDueAt<equipment.receivedAt)throw new EquipmentValidationError("Next calibration due date cannot be earlier than the received date");
+      if(equipment.receivedAt&&input.nextMaintenanceDueAt&&input.nextMaintenanceDueAt<equipment.receivedAt)throw new EquipmentValidationError("Next maintenance due date cannot be earlier than the received date");
+      const updated=(await tx.$queryRaw<EquipmentRecord[]>(Prisma.sql`UPDATE "Equipment" SET "nextCalibrationDueAt"=${input.nextCalibrationDueAt},"nextMaintenanceDueAt"=${input.nextMaintenanceDueAt},"updatedAt"=CURRENT_TIMESTAMP WHERE "organizationId"=${input.organizationId}::uuid AND "id"=${input.equipmentId}::uuid RETURNING *`))[0];
+      if(!updated)throw new EquipmentValidationError("Equipment schedule could not be corrected");
+      await tx.auditEvent.create({data:{organizationId:input.organizationId,actorUserId:input.actorUserId,action:"EQUIPMENT_SCHEDULE_CORRECTED",entityType:"Equipment",entityId:input.equipmentId,reason:input.reason,metadata:{equipmentNumber:equipment.equipmentNumber,previousCalibrationDueAt:equipment.nextCalibrationDueAt?.toISOString()??null,nextCalibrationDueAt:updated.nextCalibrationDueAt?.toISOString()??null,previousMaintenanceDueAt:equipment.nextMaintenanceDueAt?.toISOString()??null,nextMaintenanceDueAt:updated.nextMaintenanceDueAt?.toISOString()??null}}});
+      return updated;
+    });
+  }
 }
